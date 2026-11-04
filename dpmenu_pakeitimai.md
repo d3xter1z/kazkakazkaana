@@ -4,6 +4,9 @@ Autorius: Dex. Naujausia versija viršuje.
 
 Versijos: 1 – dialogų versija, 2 – mimgui. 2.x.x: vidurinis skaičius keičiasi su didesniais pakeitimais, paskutinis – su smulkiais.
 
+## 2.11.2
+- Atnaujinimai iškart po įkėlimo: versija ir failas imami iš paskutinio GitHub commit'o (per GitHub API), o ne iš „main“, kurį GitHub iki ~5 min. rodo seną.
+
 ## 2.11.1
 - Skiltis „Patikros statusas“ pervadinta į „Statusas“.
 

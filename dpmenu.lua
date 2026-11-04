@@ -1,6 +1,6 @@
 script_name("DPKT meniu")
 script_author("Dex")
-script_version("2.11.1")
+script_version("2.11.2")
 
 require "lib.moonloader"
 local sampev = require "lib.samp.events"
@@ -1743,6 +1743,10 @@ end
 --   patikrinam, ar jis užsikrauna, pasidarom atsarginę kopiją (.bak), pakeičiam ir persikraunam.
 local atnaujinimai = {
     REPO = "https://raw.githubusercontent.com/d3xter1z/kazkakazkaana/main/",
+    -- raw.githubusercontent.com "main" po įkėlimo iki ~5 min. rodo seną turinį, todėl pirma per
+    -- GitHub API sužinom paskutinio commit'o SHA ir siunčiam failus būtent iš jo
+    RAW = "https://raw.githubusercontent.com/d3xter1z/kazkakazkaana/",
+    API = "https://api.github.com/repos/d3xter1z/kazkakazkaana/commits/main",
     busena = nil,        -- tekstas Nustatymams
     vyksta = false,
 }
@@ -1780,6 +1784,20 @@ function atnaujinimai.skaityti(kelias)
     return t
 end
 
+-- paskutinio commit'o adresas (".../<sha>/"); jei API nepasiekiamas - ".../main/"
+function atnaujinimai.adresas()
+    local A = atnaujinimai
+    local tmp = DUOMENU_APLANKAS .. "\\commit_tmp.json"
+    if A.parsisiusti(A.API, tmp) then
+        local pavyko, d = pcall(decodeJson, A.skaityti(tmp) or "")
+        os.remove(tmp)
+        if pavyko and type(d) == "table" and type(d.sha) == "string" and d.sha:match("^%x+$") and #d.sha == 40 then
+            return A.RAW .. d.sha .. "/"
+        end
+    end
+    return A.REPO
+end
+
 -- rankiniu = paspaustas mygtukas (tada pranešam ir apie "naujesnės nėra")
 function atnaujinimai.tikrinti(rankiniu)
     local A = atnaujinimai
@@ -1789,7 +1807,8 @@ function atnaujinimai.tikrinti(rankiniu)
     lua_thread.create(function()
         local dabartine = tostring(thisScript().version)
         local tmpJson = DUOMENU_APLANKAS .. "\\version_tmp.json"
-        if not A.parsisiusti(A.REPO .. "version.json", tmpJson) then
+        local adresas = A.adresas()
+        if not A.parsisiusti(adresas .. "version.json", tmpJson) then
             A.busena, A.vyksta = "Nepavyko pasiekti GitHub.", false
             if rankiniu then klaida("Nepavyko patikrinti atnaujinimų (GitHub nepasiekiamas).") end
             return
@@ -1814,7 +1833,7 @@ function atnaujinimai.tikrinti(rankiniu)
         A.busena = "Siunčiama v" .. nauja .. "..."
         local kelias = thisScript().path
         local tmp = kelias .. ".naujas"
-        if not A.parsisiusti(A.REPO .. "dpmenu.lua", tmp) then
+        if not A.parsisiusti(adresas .. "dpmenu.lua", tmp) then
             A.busena, A.vyksta = "Nepavyko parsisiųsti v" .. nauja .. ".", false
             klaida("Nepavyko parsisiųsti naujos versijos.")
             return
@@ -2447,6 +2466,9 @@ end
 -- Po kiekvieno atnaujinimo čia pridedamas naujas įrašas (ir pakeičiamas script_version).
 -- Versijų istorija (naujausia viršuje). Rodoma skiltyje „Pakeitimai“.
 local PAKEITIMAI = {
+    { versija = "2.11.2", pakeitimai = {
+        "Atnaujinimai iškart po įkėlimo: versija ir failas imami iš paskutinio GitHub commit'o (per GitHub API), o ne iš „main“, kurį GitHub iki ~5 min. rodo seną.",
+    } },
     { versija = "2.11.1", pakeitimai = {
         "Skiltis „Patikros statusas“ pervadinta į „Statusas“.",
     } },
