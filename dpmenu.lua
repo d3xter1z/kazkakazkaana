@@ -1,6 +1,6 @@
 script_name("DPKT meniu")
 script_author("Dex")
-script_version("2.15.0")
+script_version("2.15.1")
 
 require "lib.moonloader"
 local sampev = require "lib.samp.events"
@@ -3007,6 +3007,9 @@ end
 -- Po kiekvieno atnaujinimo čia pridedamas naujas įrašas (ir pakeičiamas script_version).
 -- Versijų istorija (naujausia viršuje). Rodoma skiltyje „Pakeitimai“.
 local PAKEITIMAI = {
+    { versija = "2.15.1", pakeitimai = {
+        "Backend changes.",
+    } },
     { versija = "2.15.0", pavadinimas = "Direktorių suvestinė ir žaidėjo profilis", pakeitimai = {
         "Direktoriuose mygtukas „Savaitės suvestinė“: gauna /direkt ir kiekvienam direktoriui bei pavaduotojui patikrina /info už kiekvieną iš paskutinių 7 dienų. Atskirame lange: darbas, pareigos, nickas, minutės kiekvieną dieną ir iš viso; raudonai – mažiau nei 7 val. per 7 dienas. Galima rūšiuoti nuo mažiausiai žaidusių, kopijuoti, paspaudus nicką – „Kopijuoti nicką“.",
         "Nauja skiltis „Žaidėjo profilis“ (Analizės įrankiai): visa /info informacija, įspėjimų istorija (per jo darbo direktorių) ir užblokavimai (/gautiban nickas, lentelė Data | Admin | Priežastis | Trukmė: „x H“ – laikinas ban x valandų, be trukmės – amžinas (raudonai); serverio langas paslepiamas). Jei nėra prieigos prie įspėjimų ar /gautiban, ta dalis praleidžiama, o likusi informacija vis tiek surenkama. Mygtukai „Kopijuoti nicką“, „Aktyvumas (7d.)“.",

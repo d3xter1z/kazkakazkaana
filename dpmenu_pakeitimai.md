@@ -4,6 +4,9 @@ Autorius: Dex. Naujausia versija viršuje.
 
 Versijos: 1 – dialogų versija, 2 – mimgui. 2.x.x: vidurinis skaičius keičiasi su didesniais pakeitimais, paskutinis – su smulkiais.
 
+## 2.15.1
+- Backend changes.
+
 ## 2.15.0 – Direktorių suvestinė ir žaidėjo profilis
 - Direktoriuose mygtukas „Savaitės suvestinė“: gauna /direkt ir kiekvienam direktoriui bei pavaduotojui patikrina /info už kiekvieną iš paskutinių 7 dienų. Atskirame lange: darbas, pareigos, nickas, minutės kiekvieną dieną ir iš viso; raudonai – mažiau nei 7 val. per 7 dienas. Galima rūšiuoti nuo mažiausiai žaidusių, kopijuoti, paspaudus nicką – „Kopijuoti nicką“.
 - Nauja skiltis „Žaidėjo profilis“ (Analizės įrankiai): visa /info informacija, įspėjimų istorija (per jo darbo direktorių) ir užblokavimai (/gautiban nickas, lentelė Data | Admin | Priežastis | Trukmė: „x H“ – laikinas ban x valandų, be trukmės – amžinas (raudonai); serverio langas paslepiamas). Jei nėra prieigos prie įspėjimų ar /gautiban, ta dalis praleidžiama, o likusi informacija vis tiek surenkama. Mygtukai „Kopijuoti nicką“, „Aktyvumas (7d.)“.
