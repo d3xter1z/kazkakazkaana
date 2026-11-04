@@ -1,6 +1,6 @@
 script_name("DPKT meniu")
 script_author("Dex")
-script_version("2.11.0")
+script_version("2.11.1")
 
 require "lib.moonloader"
 local sampev = require "lib.samp.events"
@@ -178,7 +178,7 @@ local NUMATYTI_NUSTATYMAI = {
     perimtiArsutapo = true,      -- /arsutapo rodyti DPKT meniu lange
     perimtiNoriudarbo = false,   -- /noriudarbo be ID atidaro "Pakeisti darbą" (išjungus - serverio komanda)
     slepti = true,               -- slėpti chate eilutes, kurias renka scriptas
-    chate = false,               -- pranešimus rodyti ir chate (ne tik skiltyje "Patikros statusas")
+    chate = false,               -- pranešimus rodyti ir chate (ne tik skiltyje "Statusas")
     pasveikinimas = true,        -- "DPKT meniu įkeltas" žinutė
     zurnalas = true,             -- /visidarbuotojai rinkimo output į failą (derinimui)
     autoAtnaujinimai = true,     -- įkėlus scriptą tikrinti GitHub ir atsinaujinti
@@ -229,7 +229,7 @@ local function saugusLtu(tekstas)
     return (tekstas:gsub("[\x80-\xFF]+", "?"))
 end
 
--- Visi scripto pranešimai rodomi DPKT meniu skiltyje "Patikros statusas", ne chate
+-- Visi scripto pranešimai rodomi DPKT meniu skiltyje "Statusas", ne chate
 -- (chate lieka tik žinutė įkėlus scriptą; nustatymuose galima įjungti dubliavimą į chatą).
 local MAX_STATUSO_IRASU = 300
 local statusas = {
@@ -237,7 +237,7 @@ local statusas = {
     patikra = nil,    -- { pavadinimas, pradzia = "12:34:56", t0, busena = "vyksta" | "baigta" | "nutraukta", trukme }
     naujas = nil,     -- paskutinis pranešimas apatinei juostai { tekstas, tipas, t }
     slinkti = false,  -- naujas įrašas: nuslinkti sąrašą į apačią
-    perjungti = false -- prasidėjo patikra: atidaryti skiltį "Patikros statusas"
+    perjungti = false -- prasidėjo patikra: atidaryti skiltį "Statusas"
 }
 
 local function statusoIrasas(tekstas, tipas)
@@ -408,7 +408,7 @@ local uzimtas = false
 -- vykstančio veiksmo eiga, rodoma lange
 local eiga = { tekstas = nil, dabar = 0, viso = 0 }
 
--- rodytiStatusa: atidaryti skiltį "Patikros statusas" (ilgoms patikroms)
+-- rodytiStatusa: atidaryti skiltį "Statusas" (ilgoms patikroms)
 local function pradetiEiga(tekstas, viso, rodytiStatusa)
     eiga.tekstas, eiga.dabar, eiga.viso = tekstas, 0, viso
     statusas.patikra = { pavadinimas = tekstas, pradzia = os.date("%H:%M:%S"), t0 = localClock(), busena = "vyksta" }
@@ -1115,7 +1115,7 @@ function sampev.onServerMessage(spalva, tekstas)
     end
 
     -- serverio atsakymai į scripto /skirtidir ir /skirtipav (paskyrimas, nuėmimas) slepiami
-    -- chate ir rodomi skiltyje "Patikros statusas". Tikrinam tik ~2 s po scripto komandos, kad
+    -- chate ir rodomi skiltyje "Statusas". Tikrinam tik ~2 s po scripto komandos, kad
     -- nepaslėptume kitų žinučių. (Nebetikrinam "uzimtas": paskutinis /skirtidir 0 išsiunčiamas
     -- jau pačioje pabaigoje, o atsakymas ateina, kai patikra jau baigta.)
     if nust.slepti and prieiga.komanda and localClock() - prieiga.laikas < 2
@@ -2260,7 +2260,7 @@ end
 
 local SKIRTUKAI = {
     { id = "pagrindinis", pavadinimas = "Pagrindinis" },
-    { id = "statusas",    pavadinimas = "Patikros statusas", dinaminis = true },
+    { id = "statusas",    pavadinimas = "Statusas", dinaminis = true },
     { grupe = "Įrankiai" },
     { id = "darbai",      pavadinimas = "Darbų patikra" },
     { id = "keisti",      pavadinimas = "Pakeisti darbą" },
@@ -2288,7 +2288,7 @@ atidarytiMeniu = function(skirtukas)
     end
     if skirtukas then
         ui.skirtukas = skirtukas
-        statusas.perjungti = false   -- aiškiai nurodytas skirtukas svarbesnis už "Patikros statusas"
+        statusas.perjungti = false   -- aiškiai nurodytas skirtukas svarbesnis už "Statusas"
     end
     ui.atidarytas[0] = true
 end
@@ -2447,6 +2447,9 @@ end
 -- Po kiekvieno atnaujinimo čia pridedamas naujas įrašas (ir pakeičiamas script_version).
 -- Versijų istorija (naujausia viršuje). Rodoma skiltyje „Pakeitimai“.
 local PAKEITIMAI = {
+    { versija = "2.11.1", pakeitimai = {
+        "Skiltis „Patikros statusas“ pervadinta į „Statusas“.",
+    } },
     { versija = "2.11.0", pavadinimas = "Automatiniai atnaujinimai", pakeitimai = {
         "Įkėlus scriptą tikrinama GitHub (d3xter1z/kazkakazkaana) ir, jei yra naujesnė versija, ji parsisiunčiama ir įdiegiama automatiškai.",
         "Parsiųstas failas patikrinamas (ar užsikrauna), senas išsaugomas kaip dpmenu.lua.bak, sugadintas atnaujinimas neįdiegiamas.",
@@ -3667,7 +3670,7 @@ local function rodytiNustatymus()
     zymimasis("perimtiArsutapo", "Rodyti /arsutapo DPKT meniu lange", "vietoj serverio lango")
     zymimasis("perimtiNoriudarbo", "/noriudarbo be ID atidaro „Pakeisti darbą“", "vietoj serverio komandos")
     zymimasis("slepti", "Slėpti chate eilutes, kurias renka scriptas", "/visidarbuotojai, /dfondas, /info, /skirtidir atsakymai patikros metu")
-    zymimasis("chate", "Pranešimus rodyti ir chate", "ne tik skiltyje Patikros statusas")
+    zymimasis("chate", "Pranešimus rodyti ir chate", "ne tik skiltyje Statusas")
     zymimasis("pasveikinimas", "Rodyti žinutę įkėlus scriptą")
 
     skyrius("Patikros")
@@ -3722,7 +3725,7 @@ local function trukmesTekstas(sek)
 end
 
 local function rodytiStatusa()
-    T("Patikros statusas")
+    T("Statusas")
     TPilkas("Čia rodoma viskas, ką scriptas daro ir ką praneša.")
     imgui.Separator()
 
@@ -4206,14 +4209,14 @@ imgui.OnFrame(function() return ui.atidarytas[0] end, function()
     if rodyti then rodyti() end
     imgui.EndChild()
 
-    -- apatinė juosta: kelias sekundes rodo naujausią pranešimą (paspaudus - Patikros statusas)
+    -- apatinė juosta: kelias sekundes rodo naujausią pranešimą (paspaudus - Statusas)
     imgui.Separator()
     local n = statusas.naujas
     if n and ui.skirtukas ~= "statusas" and localClock() - n.t < 8 then
         local tekstas = "* " .. n.tekstas
         imgui.SetCursorPosX(math.max(8, (imgui.GetWindowWidth() - imgui.CalcTextSize(tekstas).x) / 2))
         T(tekstas, STATUSO_SPALVOS[n.tipas] or SPALVA_ZALIA)
-        if imgui.IsItemHovered() then imgui.SetTooltip("Spausk, kad atidarytum Patikros statusą") end
+        if imgui.IsItemHovered() then imgui.SetTooltip("Spausk, kad atidarytum Statusą") end
         if imgui.IsItemClicked() then ui.skirtukas = "statusas" end
     else
         local paraso = "Made by Dex, with love, mua :3"
@@ -4297,7 +4300,7 @@ imgui.OnFrame(function() return ispejimai.langas ~= nil and ispejimai.langas.ati
         eigosJuosta()
         TPilkas("Laukiama serverio atsakymo...")
     elseif L.busena == "nutraukta" then
-        T("Patikra nutraukta (žr. Patikros statusas).", SPALVA_RAUDONA)
+        T("Patikra nutraukta (žr. Statusas).", SPALVA_RAUDONA)
     elseif L.busena == "neatsake" then
         T("Serveris neatsakė į /ispejimai.", SPALVA_RAUDONA)
     end

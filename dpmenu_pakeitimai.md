@@ -4,6 +4,9 @@ Autorius: Dex. Naujausia versija viršuje.
 
 Versijos: 1 – dialogų versija, 2 – mimgui. 2.x.x: vidurinis skaičius keičiasi su didesniais pakeitimais, paskutinis – su smulkiais.
 
+## 2.11.1
+- Skiltis „Patikros statusas“ pervadinta į „Statusas“.
+
 ## 2.11.0 – Automatiniai atnaujinimai
 - Įkėlus scriptą tikrinama GitHub (d3xter1z/kazkakazkaana) ir, jei yra naujesnė versija, ji parsisiunčiama ir įdiegiama automatiškai.
 - Parsiųstas failas patikrinamas (ar užsikrauna), senas išsaugomas kaip dpmenu.lua.bak, sugadintas atnaujinimas neįdiegiamas.
