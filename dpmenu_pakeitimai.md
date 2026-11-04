@@ -4,6 +4,26 @@ Autorius: Dex. Naujausia versija viršuje.
 
 Versijos: 1 – dialogų versija, 2 – mimgui. 2.x.x: vidurinis skaičius keičiasi su didesniais pakeitimais, paskutinis – su smulkiais.
 
+## 2.13.0 – Užblokavimai
+- Nauja skiltis „Užblokavimai“ (Įrankiai): atidarius automatiškai siunčiamas /bans, serverio langas paslepiamas, rodoma lentelė Žaidėjas | Admin | Data | Priežastis su paieška.
+- Paspaudus užblokuotą žaidėją: Kopijuoti nicką arba Atblokuoti (su patvirtinimu, /unban nickas, po to sąrašas atnaujinamas). Paspaudus adminą: Kopijuoti nicką.
+- „Sugeneruoti (Dev)“ su atsitiktiniais duomenimis (atblokuojant nieko nesiunčiama).
+
+## 2.12.2
+- Aktyvumo stulpelis „Darbas“ prisitaiko prie ilgiausio teksto (nebenusikerpa, pvz. „Tolimųjų reisų vairuotojas | Cosa Nostra“).
+- Raudonai pažymima ir diena, kai darbas pasikeitė be „nuo“ datos (pvz. įstojo į mafiją) – su „(pasikeitė)“.
+- Darbas ir mafija/gauja rodomi per kablelį (pvz. „Tolimųjų reisų vairuotojas, Cosa Nostra“), kad kopijuojant nesimaišytų su stulpelių skirtuku.
+- Iš aktyvumo formos išimtas „Darbas“ pasirinkimas: darbas ir jo rodikliai imami iš /info, direktoriaus užsidėti nebereikia.
+
+## 2.12.1
+- Atidarius „Direktoriai“ skiltį /direkt išsiunčiamas automatiškai – nebereikia spausti „Atnaujinti“.
+
+## 2.12.0 – Darbas aktyvume
+- Aktyvumo patikra iš /info paima žaidėjo darbą ir nuo kada jame dirba, pvz. „Darbas: Mechanikas nuo 2026-09-26“. Mafijoms ir gaujoms rodomas jų pavadinimas (pvz. „Cosa Nostra“), pravardės ir „Nedirbi“ nuimami.
+- Jei per tikrinamą laikotarpį darbas pasikeitė (ar žaidėjas įsidarbino), lentelėje atsiranda stulpelis „Darbas“, o diena, kai įsidarbino, pažymima raudonai su „(įsidarbino)“.
+- Iš /info paimami ir darbo rodikliai, kurie eina po žuvų eilutės (pvz. Atvyko, Pardavimai, Atgabenimai, Baudos | Iškvietimai, Žala) – kiekvienam atskiras stulpelis su suma ir vidurkiu. Tam nereikia direktoriaus.
+- Darbas ir rodikliai įtraukiami į „Kopijuoti visą lentelę“, Dev režime generuojami ir jie, ir darbo pasikeitimas.
+
 ## 2.11.2
 - Atnaujinimai iškart po įkėlimo: versija ir failas imami iš paskutinio GitHub commit'o (per GitHub API), o ne iš „main“, kurį GitHub iki ~5 min. rodo seną.
 

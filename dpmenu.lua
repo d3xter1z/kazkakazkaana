@@ -1,6 +1,6 @@
 script_name("DPKT meniu")
 script_author("Dex")
-script_version("2.11.2")
+script_version("2.13.0")
 
 require "lib.moonloader"
 local sampev = require "lib.samp.events"
@@ -130,6 +130,8 @@ local KOMANDOS = {
     arsutapo             = "/arsutapo %s %s",     -- paskyra 1, paskyra 2
     visidarbuotojaiData  = "/visidarbuotojai %s", -- konkrečiai dienai (data MMMM-MM-DD)
     ispejimai            = "/ispejimai %s",       -- žaidėjo įspėjimų istorija (reikia to darbo direktoriaus)
+    banai                = "/bans",               -- "Paskutiniai ban" langas
+    atblokuoti           = "/unban %s",           -- užblokuoto žaidėjo nickas
 }
 
 -- Paskyrų sutapimas: per kiek minučių prisijungimas prie kitos paskyros laikomas persijungimu.
@@ -791,23 +793,58 @@ end
 
 -- /info: Žaidė Šiandien: 105min | Pravažiavo Šiandien: 0.35km | Patirtis: 4.505.940XP |
 --        Šiandien pagavo žuvų už: 0€ | Nėra informacijos
-local MINUCIU_SABLONAS  = ltu("Šiandien") .. ":?%s*(%d+)%s*min"
-local KM_SABLONAS       = ltu("Šiandien") .. ":?%s*(%d+[%.,]?%d*)%s*km"
-local PATIRTIS_SABLONAS = "Patirtis:?%s*([%d%.,]+)%s*XP"
-local ZUVU_SABLONAS     = ltu("pagavo žuvų už") .. ":?%s*([%d%.,]+)"
-local NERA_INFORMACIJOS = ltu("Nėra informacijos")
+local INFO_SABLONAI = {
+    minutes  = ltu("Šiandien") .. ":?%s*(%d+)%s*min",
+    km       = ltu("Šiandien") .. ":?%s*(%d+[%.,]?%d*)%s*km",
+    patirtis = "Patirtis:?%s*([%d%.,]+)%s*XP",
+    zuvys    = ltu("pagavo žuvų už") .. ":?%s*([%d%.,]+)",
+    nera     = ltu("Nėra informacijos"),
+}
 
 local function atpazintiInfo(tekstas)
     local t = nuimtiSpalvas(tekstas)
     local r = {}
-    local min = t:match(MINUCIU_SABLONAS)
+    local min = t:match(INFO_SABLONAI.minutes)
     if min then r.minutes = tonumber(min) end
-    local km = t:match(KM_SABLONAS)
+    local km = t:match(INFO_SABLONAI.km)
     if km then r.km = tonumber((km:gsub(",", "."))) end
-    r.xp = t:match(PATIRTIS_SABLONAS)
-    local zuvys = t:match(ZUVU_SABLONAS)
+    r.xp = t:match(INFO_SABLONAI.patirtis)
+    local zuvys = t:match(INFO_SABLONAI.zuvys)
     if zuvys then r.zuvys = sumaIsTeksto(zuvys) end
-    if t:find(NERA_INFORMACIJOS, 1, true) then
+    -- "Darbas: Mechanikas nuo 2026-09-26 („pravardė“)", "Darbas: *Tolimųjų reisų vairuotojas nuo ... | ...",
+    -- mafijos/gaujos: "Darbas: Nedirbi  | *Cosa Nostra („pravardė“)". Dalys per "|"; "Nedirbi" ir pravardės nuimamos.
+    local darboEil = t:match("Darbas:%s*([^\n]+)")
+    if darboEil then
+        local vardai = {}
+        for dalis in (darboEil .. "|"):gmatch("(.-)|") do
+            dalis = apkarpyti(dalis):gsub("^%*", "")
+            local pav, nuo = dalis:match("^(.-)%s+nuo%s+(%d%d%d%d%-%d%d%-%d%d)")
+            if not pav then pav = dalis:gsub("%s*%(.*$", "") end
+            pav = apkarpyti(pav)
+            if nuo and not r.darboNuo then r.darboNuo = nuo end
+            if pav ~= "" and pav ~= "Nedirbi" and not pav:find("^Rangas") then
+                local pavyko, u = pcall(u8, pav)
+                vardai[#vardai + 1] = pavyko and u or pav
+            end
+        end
+        r.darboPav = #vardai > 0 and table.concat(vardai, ", ") or "Nedirbi"   -- ne " | ", nes juo skiriami kopijuojami stulpeliai
+    end
+    -- darbo rodikliai: visos "Pavadinimas: skaičius" eilutės po žuvų eilutės (kiekvienas darbas turi savo)
+    local poZuvu = t:match(ltu("pagavo žuvų už") .. "[^\n]*\n(.*)$")
+    if poZuvu then
+        -- viena eilutė gali turėti kelis rodiklius: "Baudos: 12 | Iškvietimai: 1"
+        for eilute in (poZuvu:gsub("|", "\n") .. "\n"):gmatch("(.-)\n") do
+            local pav, reiksme = eilute:match("^%s*([^:]-)%s*:%s*(%d[%d%.,]*%s*[^%s%d]*)%s*$")
+            if pav and pav ~= "" then
+                reiksme = apkarpyti(reiksme)
+                local ok1, pu = pcall(u8, pav)
+                local ok2, ru = pcall(u8, reiksme)
+                r.infoDarbas = r.infoDarbas or {}
+                r.infoDarbas[#r.infoDarbas + 1] = { ok1 and pu or pav, ok2 and ru or reiksme }
+            end
+        end
+    end
+    if t:find(INFO_SABLONAI.nera, 1, true) then
         r.minutes = r.minutes or 0
         r.km = r.km or 0
         r.zuvys = r.zuvys or 0
@@ -1025,6 +1062,13 @@ local function atsitiktinisAktyvumas(nickas, nuo, iki, darbas)
     nuo = nuo or (os.time() - dienu * 86400)
     local r = { dienos = {}, visoMin = 0, visoKm = 0, visoZuvys = 0, neatsake = 0 }
     local xp = math.random(1000000, 5000000)
+    -- darbas pagal /info: 40% atvejų per laikotarpį pasikeičia
+    local DARBAI = { "Mechanikas", "Policininkas", "Medikas", "Taksistas", "Reporteris", "Kareivis" }
+    local senas = DARBAI[math.random(#DARBAI)]
+    local naujas = DARBAI[math.random(#DARBAI)]
+    while naujas == senas do naujas = DARBAI[math.random(#DARBAI)] end
+    local senoNuo = os.date(DATOS_FORMATAS, nuo - math.random(5, 300) * 86400)
+    local keitimoDiena = math.random() < 0.4 and math.random(1, dienu - 1) or nil
     for i = 0, dienu - 1 do
         local min = math.random() < 0.15 and 0 or math.random(20, 600)
         local km = min > 0 and math.random(0, 3000) / 10 or 0
@@ -1032,6 +1076,18 @@ local function atsitiktinisAktyvumas(nickas, nuo, iki, darbas)
         xp = xp + min * math.random(20, 40)
         local d = { data = os.date(DATOS_FORMATAS, nuo + i * 86400), minutes = min, km = km,
                     zuvys = zuvys, xp = formatuotiSuma(xp) }
+        if keitimoDiena and i >= keitimoDiena then
+            d.darboPav, d.darboNuo = naujas, os.date(DATOS_FORMATAS, nuo + keitimoDiena * 86400)
+        else
+            d.darboPav, d.darboNuo = senas, senoNuo
+        end
+        local RODIKLIAI = { Mechanikas = { "Atvyko", "Atgabenimai" }, Policininkas = { "Atvyko", "Baudos" },
+                            Medikas = { "Atvyko", "Pagydymai" }, Taksistas = { "Atvyko", "Atvežimai" },
+                            Reporteris = { "Atvyko", "Eteryje" }, Kareivis = { "Atvyko" } }
+        d.infoDarbas = {}
+        for _, pav in ipairs(RODIKLIAI[d.darboPav] or { "Atvyko" }) do
+            d.infoDarbas[#d.infoDarbas + 1] = { pav, tostring(min > 0 and math.random(0, 12) or 0) }
+        end
         if darbas then
             d.darbas = {}
             for _, laukas in ipairs(DARBU_STULPELIAI[darbas.id] or NUMATYTI_STULPELIAI) do
@@ -1102,6 +1158,7 @@ local rinkimas = {
     direkt = nil,       -- { gauta = true } kol laukiama /direkt lentelės (prieš renkant darbuotojus)
     ispejimai = nil,    -- { eilutes = {}, paskutine, langas = { stilius, antraste, tekstas } } kol laukiama /ispejimai
     efondas = nil,      -- { id = "mg" | "t" | "e" } kol laukiama /mgfondas, /tfondas ar /efondas lango
+    banai = nil,        -- { langas = tekstas } kol laukiama /bans lango
 }
 
 local TOKIOS_KOMANDOS_NERA = ltu("Tokios komandos nėra")
@@ -1212,6 +1269,13 @@ function sampev.onShowDialog(id, stilius, antraste, mygtukas1, mygtukas2, teksta
             and localClock() - prieiga.laikas < LAUKTI_ILGIAUSIAI + 1
     end
 
+    -- /bans langas "Paskutiniai ban": Žaidėjas | Admin | Data | Priežastis
+    if rinkimas.banai and not rinkimas.banai.langas and tostring(antraste):find("ban", 1, true) then
+        rinkimas.banai.langas = tekstas
+        lua_thread.create(function() wait(0) sampSendDialogResponse(id, 0, 0, "") end)
+        return false
+    end
+
     -- /mgfondas, /tfondas, /efondas langas: "Data | Vardas | Suma", antraštėje likutis
     if rinkimas.efondas and not rinkimas.efondas.langas
             and (tostring(antraste):find("fonde", 1, true) or tostring(tekstas):find("Vardas", 1, true)) then
@@ -1231,6 +1295,7 @@ function sampev.onShowDialog(id, stilius, antraste, mygtukas1, mygtukas2, teksta
     if stilius == 5 and tostring(antraste):find("Direktoriai", 1, true) then
         local r = atpazintiDirekt(tekstas)
         if r then
+            r.laikas = localClock()   -- kad atidarius Direktorių skiltį /direkt nebūtų siunčiamas iš karto vėl
             duomenys.direkt = r
             -- rinkimo metu: lentelė reikalinga tik direktoriams pažymėti, langą paslepiam
             if rinkimas.direkt then
@@ -1738,6 +1803,93 @@ function eventFondai.duoti(id, nickas, suma)
     end)
 end
 
+-- Užblokavimai: /bans ("Paskutiniai ban") lentelė, nicko kopijavimas ir /unban
+local uzblokavimai = {
+    duomenys = nil,    -- { irasai = { { zaidejas, adminas, data, priezastis } }, gauta, atsitiktiniai }
+    kraunama = false,
+    klaida = nil,
+    matomas = false,
+    paieska = new.char[32](),
+}
+
+function uzblokavimai.atpazinti(tekstas)
+    local r = { irasai = {}, gauta = os.date("%Y-%m-%d %H:%M") }
+    for eilute in (tostring(tekstas or "") .. "\n"):gmatch("(.-)\n") do
+        local l = {}
+        for x in (eilute .. "\t"):gmatch("(.-)\t") do
+            local pavyko, u = pcall(u8, apkarpyti(nuimtiSpalvas(x)))
+            l[#l + 1] = pavyko and u or x
+        end
+        -- antraštė ir tuščios eilutės praleidžiamos
+        if l[1] and l[1] ~= "" and l[3] and l[3]:match("^%d%d%d%d%-%d%d%-%d%d") then
+            r.irasai[#r.irasai + 1] = { zaidejas = l[1], adminas = l[2] or "", data = l[3], priezastis = l[4] or "" }
+        end
+    end
+    return r
+end
+
+-- Dev režimui
+function uzblokavimai.atsitiktiniai()
+    local PRIEZASTYS = { "ridos botas", "inv", "relog (skundas) (24 H)", "bugų naudojimas", "pjaustymas (skundas) (24 H)",
+                         "bugų naudojimas (skundas)", "cheatai", "įžeidinėjimai" }
+    local r = { irasai = {}, gauta = os.date("%Y-%m-%d %H:%M"), atsitiktiniai = true }
+    local laikas = os.time()
+    local adminai = {}
+    for i = 1, 4 do adminai[i] = VARDAI[math.random(#VARDAI)] .. "_" .. PAVARDES[math.random(#PAVARDES)] end
+    for _ = 1, math.random(10, 25) do
+        laikas = laikas - math.random(300, 86400)
+        r.irasai[#r.irasai + 1] = {
+            zaidejas = VARDAI[math.random(#VARDAI)] .. "_" .. PAVARDES[math.random(#PAVARDES)],
+            adminas = adminai[math.random(#adminai)], data = os.date("%Y-%m-%d %H:%M:%S", laikas),
+            priezastis = PRIEZASTYS[math.random(#PRIEZASTYS)],
+        }
+    end
+    return r
+end
+
+function uzblokavimai.atnaujinti()
+    local U = uzblokavimai
+    if uzimtas or rinkimas.banai or rinkimas.efondas then klaida("Palauk, kol baigsis ankstesnis veiksmas.") return end
+    U.kraunama, U.klaida = true, nil
+    prieiga.klaida = nil
+    rinkimas.banai = {}
+    siusti(KOMANDOS.banai)
+    lua_thread.create(function()
+        local pradzia = localClock()
+        while rinkimas.banai and not rinkimas.banai.langas and not prieiga.klaida
+                and localClock() - pradzia < LAUKTI_ILGIAUSIAI do
+            wait(100)
+        end
+        local r = rinkimas.banai
+        rinkimas.banai, U.kraunama = nil, false
+        if prieiga.klaida then
+            U.klaida = "Neturi prieigos prie " .. KOMANDOS.banai .. "."
+        elseif r and r.langas then
+            U.duomenys = U.atpazinti(r.langas)
+        else
+            U.klaida = "Negautas atsakymas į " .. KOMANDOS.banai .. "."
+            klaida(U.klaida)
+        end
+    end)
+end
+
+-- po patvirtinimo: /unban nickas, tada sąrašas atnaujinamas
+function uzblokavimai.atblokuoti(nickas)
+    local U = uzblokavimai
+    local komanda = string.format(KOMANDOS.atblokuoti, nickas)
+    if U.duomenys and U.duomenys.atsitiktiniai then
+        pranesimas(string.format("Dev režimas: būtų išsiųsta %s (atsitiktiniai duomenys, nieko nesiųsta).", komanda))
+        return
+    end
+    if uzimtas then klaida("Palauk, kol baigsis ankstesnis veiksmas.") return end
+    siusti(komanda)
+    pranesimas(string.format("Atblokavai %s (%s).", nickas, komanda))
+    lua_thread.create(function()
+        wait(PAUZE)
+        if not prieiga.klaida then U.atnaujinti() end
+    end)
+end
+
 -- Automatiniai atnaujinimai iš GitHub:
 --   version.json ({"versija": "2.11.0"}) -> jei naujesnė, parsisiunčiam dpmenu.lua į laikiną failą,
 --   patikrinam, ar jis užsikrauna, pasidarom atsarginę kopiją (.bak), pakeičiam ir persikraunam.
@@ -2153,14 +2305,15 @@ local function tikrintiAktyvuma(nickas, nuo, iki, darbas)
             if rinkimas.info.minutes then
                 local terminas = localClock() + 0.3
                 while localClock() < terminas and (not rinkimas.info.km or not rinkimas.info.xp
-                        or not rinkimas.info.zuvys) do
+                        or not rinkimas.info.zuvys or not rinkimas.info.darboPav) do
                     wait(50)
                 end
             end
             local info = rinkimas.info
             rinkimas.info = nil
 
-            local diena = { data = data, minutes = info.minutes, km = info.km, xp = info.xp, zuvys = info.zuvys }
+            local diena = { data = data, minutes = info.minutes, km = info.km, xp = info.xp, zuvys = info.zuvys,
+                            darboPav = info.darboPav, darboNuo = info.darboNuo, infoDarbas = info.infoDarbas }
             r.dienos[#r.dienos + 1] = diena
 
             -- tos dienos darbo statistika
@@ -2285,6 +2438,7 @@ local SKIRTUKAI = {
     { id = "keisti",      pavadinimas = "Pakeisti darbą" },
     { id = "blist",       pavadinimas = "Blist" },
     { id = "direktoriai", pavadinimas = "Direktoriai" },
+    { id = "uzblokavimai", pavadinimas = "Užblokavimai" },
     { grupe = "Analizės įrankiai" },
     { id = "darbuotojai", pavadinimas = "Darbuotojai" },
     { id = "fondai",      pavadinimas = "Darbų fondai" },
@@ -2304,6 +2458,8 @@ atidarytiMeniu = function(skirtukas)
     if not ui.atidarytas[0] then
         ui.gd = math.random(10) == 1
         eventFondai.matomas = false   -- Event skiltyje fondas vėl atnaujinamas
+        ui.direktMatomas = false      -- Direktorių skiltyje /direkt vėl išsiunčiamas
+        uzblokavimai.matomas = false  -- Užblokavimų skiltyje /bans vėl išsiunčiamas
     end
     if skirtukas then
         ui.skirtukas = skirtukas
@@ -2466,6 +2622,26 @@ end
 -- Po kiekvieno atnaujinimo čia pridedamas naujas įrašas (ir pakeičiamas script_version).
 -- Versijų istorija (naujausia viršuje). Rodoma skiltyje „Pakeitimai“.
 local PAKEITIMAI = {
+    { versija = "2.13.0", pavadinimas = "Užblokavimai", pakeitimai = {
+        "Nauja skiltis „Užblokavimai“ (Įrankiai): atidarius automatiškai siunčiamas /bans, serverio langas paslepiamas, rodoma lentelė Žaidėjas | Admin | Data | Priežastis su paieška.",
+        "Paspaudus užblokuotą žaidėją: Kopijuoti nicką arba Atblokuoti (su patvirtinimu, /unban nickas, po to sąrašas atnaujinamas). Paspaudus adminą: Kopijuoti nicką.",
+        "„Sugeneruoti (Dev)“ su atsitiktiniais duomenimis (atblokuojant nieko nesiunčiama).",
+    } },
+    { versija = "2.12.2", pakeitimai = {
+        "Aktyvumo stulpelis „Darbas“ prisitaiko prie ilgiausio teksto (nebenusikerpa, pvz. „Tolimųjų reisų vairuotojas | Cosa Nostra“).",
+        "Raudonai pažymima ir diena, kai darbas pasikeitė be „nuo“ datos (pvz. įstojo į mafiją) – su „(pasikeitė)“.",
+        "Darbas ir mafija/gauja rodomi per kablelį (pvz. „Tolimųjų reisų vairuotojas, Cosa Nostra“), kad kopijuojant nesimaišytų su stulpelių skirtuku.",
+        "Iš aktyvumo formos išimtas „Darbas“ pasirinkimas: darbas ir jo rodikliai imami iš /info, direktoriaus užsidėti nebereikia.",
+    } },
+    { versija = "2.12.1", pakeitimai = {
+        "Atidarius „Direktoriai“ skiltį /direkt išsiunčiamas automatiškai – nebereikia spausti „Atnaujinti“.",
+    } },
+    { versija = "2.12.0", pavadinimas = "Darbas aktyvume", pakeitimai = {
+        "Aktyvumo patikra iš /info paima žaidėjo darbą ir nuo kada jame dirba, pvz. „Darbas: Mechanikas nuo 2026-09-26“. Mafijoms ir gaujoms rodomas jų pavadinimas (pvz. „Cosa Nostra“), pravardės ir „Nedirbi“ nuimami.",
+        "Jei per tikrinamą laikotarpį darbas pasikeitė (ar žaidėjas įsidarbino), lentelėje atsiranda stulpelis „Darbas“, o diena, kai įsidarbino, pažymima raudonai su „(įsidarbino)“.",
+        "Iš /info paimami ir darbo rodikliai, kurie eina po žuvų eilutės (pvz. Atvyko, Pardavimai, Atgabenimai, Baudos | Iškvietimai, Žala) – kiekvienam atskiras stulpelis su suma ir vidurkiu. Tam nereikia direktoriaus.",
+        "Darbas ir rodikliai įtraukiami į „Kopijuoti visą lentelę“, Dev režime generuojami ir jie, ir darbo pasikeitimas.",
+    } },
     { versija = "2.11.2", pakeitimai = {
         "Atnaujinimai iškart po įkėlimo: versija ir failas imami iš paskutinio GitHub commit'o (per GitHub API), o ne iš „main“, kurį GitHub iki ~5 min. rodo seną.",
     } },
@@ -2649,6 +2825,7 @@ local PAGRINDINIO_SKILTYS = {
     { "Paskyrų sutapimas", "Per /arsutapo palygina dvi paskyras: bendri IP, bendras SAMP ID (tas pats "
                         .. "kompiuteris), persijungimai tarp paskyrų ir aiški išvada." },
     { "Nustatymai",     "Dev režimas (atsitiktiniai duomenys testavimui), pauzės, chato ir lango nustatymai." },
+    { "Užblokavimai",   "Paskutiniai ban (/bans): kas, kas užblokavo, kada, už ką. Užblokuotą galima atblokuoti (/unban)." },
     { "Event",          "Mafijų, gaujų (/mgfondas), Teisėsaugos (/tfondas) ir Event (/efondas) fondai: išrašai ir pinigų davimas." },
     { "Pakeitimai",     "Visų versijų pakeitimų istorija." },
 }
@@ -2844,10 +3021,8 @@ local function pradetiAktyvumoPatikra()
         ui.aktKlaida = string.format("Daugiausia %d dienų vienu kartu.", MAX_DIENU)
     else
         ui.aktKlaida = nil
-        local darbas = nil
-        if ui.aktDarbas > 0 then darbas = darbasPagalId(ui.aktDarbas)
-        elseif ui.aktDarbas == 0 then darbas = darboStatistika.rasti(nickas) end
-        tikrintiAktyvuma(nickas, nuo, iki, darbas)
+        -- darbas ir jo rodikliai (Atvyko, Baudos ir t.t.) imami iš /info, direktoriaus nebereikia
+        tikrintiAktyvuma(nickas, nuo, iki)
     end
 end
 
@@ -2862,6 +3037,12 @@ local function rodytiDirektorius()
     T("Direktoriai")
     imgui.SameLine()
     if imgui.SmallButton("Atnaujinti (/direkt)") then siusti("/direkt") end
+    -- atidarius skiltį /direkt išsiunčiamas automatiškai (jei ką tik negavom ir nevyksta patikra)
+    if not ui.direktMatomas then
+        ui.direktMatomas = true
+        local dd = duomenys.direkt
+        if not uzimtas and not (dd and dd.laikas and localClock() - dd.laikas < 3) then siusti("/direkt") end
+    end
     imgui.Separator()
     eigosJuosta()
 
@@ -3184,14 +3365,17 @@ local AKTYVUMO_STULPELIAI = {
 }
 
 -- viena lentelės eilutė; paspaudus bet kur ant eilutės, ji nukopijuojama
-local function aktyvumoEilute(reiksmes, raktas)
+-- raudona = visa eilutė raudonai (pvz. diena, kai žaidėjas įsidarbino)
+local function aktyvumoEilute(reiksmes, raktas, raudona)
+    if raudona then imgui.PushStyleColor(imgui.Col.Text, SPALVA_RAUDONA) end
     local paspausta = imgui.Selectable(tostring(reiksmes[1]) .. "##akt_" .. raktas,
         kopijavimas.raktas == raktas and localClock() - kopijavimas.t < 1.5, imgui.SelectableFlags.SpanAllColumns)
+    if raudona then imgui.PopStyleColor() end
     kopijavimas.uzuomina(raktas)
     if paspausta then kopijavimas.kopijuoti(table.concat(reiksmes, " | "), raktas) end
     imgui.NextColumn()
     for i = 2, #reiksmes do
-        T(reiksmes[i])
+        T(reiksmes[i], raudona and SPALVA_RAUDONA or nil)
         imgui.NextColumn()
     end
 end
@@ -3252,28 +3436,7 @@ local function rodytiAktyvuma()
     imgui.InputText("##akt_nuo", ui.aktNuo, ffi.sizeof(ui.aktNuo))
     T("Iki") imgui.SameLine(110)
     imgui.InputText("##akt_iki", ui.aktIki, ffi.sizeof(ui.aktIki))
-    T("Darbas") imgui.SameLine(110)
-    local rastas = darboStatistika.rasti(skaityti(ui.aktNickas))
-    local perziura
-    if ui.aktDarbas == -1 then perziura = "Nerinkti"
-    elseif ui.aktDarbas > 0 then perziura = (darbasPagalId(ui.aktDarbas) or {}).pavadinimas or "?"
-    else perziura = "Automatiškai" .. (rastas and (" (" .. rastas.pavadinimas .. ")") or "") end
-    if imgui.BeginCombo("##akt_darbas", perziura) then
-        if imgui.Selectable("Automatiškai##akt_d_auto", ui.aktDarbas == 0) then ui.aktDarbas = 0 end
-        if imgui.Selectable("Nerinkti darbo statistikos##akt_d_ne", ui.aktDarbas == -1) then ui.aktDarbas = -1 end
-        imgui.Separator()
-        for _, dd in ipairs(DIREKTORIU_DARBAI) do
-            if imgui.Selectable(dd.pavadinimas .. "##akt_d" .. dd.id, ui.aktDarbas == dd.id) then ui.aktDarbas = dd.id end
-        end
-        imgui.EndCombo()
-    end
-    if imgui.IsItemHovered() then
-        imgui.SetTooltip("Kiek ko žaidėjas surinko darbe kiekvieną dieną (/visidarbuotojai, reikia to darbo direktoriaus)")
-    end
     imgui.PopItemWidth()
-    if ui.aktDarbas == 0 and not rastas and skaityti(ui.aktNickas) ~= "" then
-        TPilkas("Darbas nerastas Darbuotojų duomenyse, darbo statistika nebus renkama.")
-    end
     if ui.aktKlaida then T(ui.aktKlaida, SPALVA_RAUDONA) end
     if imgui.Button("Tikrinti", imgui.ImVec2(160, 28)) then pradetiAktyvumoPatikra() end
     imgui.EndGroup()
@@ -3307,8 +3470,36 @@ local function rodytiAktyvuma()
         for _, st in ipairs(darboSt) do sar[#sar + 1] = pagal[st] or "-" end
         return sar, pagal
     end
-    local dienuEilutes = {}
+    -- žaidėjo darbas pagal /info: jei per laikotarpį keitėsi (ar įsidarbino), rodom stulpelį "Darbas"
+    local paskDarbas, ankstesnis, keitesi = nil, nil, false
+    local pirmaData, paskData = r.dienos[1] and r.dienos[1].data, r.dienos[#r.dienos] and r.dienos[#r.dienos].data
     for _, d in ipairs(r.dienos) do
+        if d.darboPav then
+            if ankstesnis and d.darboPav ~= ankstesnis then keitesi = true end
+            ankstesnis, paskDarbas = d.darboPav, d
+        end
+        if d.darboNuo and pirmaData and d.darboNuo >= pirmaData and d.darboNuo <= paskData then keitesi = true end
+    end
+    local function isidarbino(d) return d.darboNuo ~= nil and d.darboNuo == d.data end
+    -- darbo rodikliai iš /info (Atvyko, Pardavimai ir t.t.): visų dienų stulpeliai
+    local infoSt, infoYra = {}, {}
+    for _, d in ipairs(r.dienos) do
+        for _, l in ipairs(d.infoDarbas or {}) do
+            if not infoYra[l[1]] then infoYra[l[1]] = true; infoSt[#infoSt + 1] = l[1] end
+        end
+    end
+    local function infoReiksmes(d)
+        local pagal = {}
+        for _, l in ipairs(d.infoDarbas or {}) do pagal[l[1]] = l[2] end
+        local sar = {}
+        for _, st in ipairs(infoSt) do sar[#sar + 1] = pagal[st] or "-" end
+        return sar, pagal
+    end
+    local dienuEilutes, raudonos = {}, {}
+    local vakarDarbas = nil
+    for _, d in ipairs(r.dienos) do
+        local pasikeite = d.darboPav and vakarDarbas and d.darboPav ~= vakarDarbas and not isidarbino(d)
+        if d.darboPav then vakarDarbas = d.darboPav end
         local e
         if d.minutes then
             e = { d.data, d.minutes .. " min", string.format("%.2f km", d.km or 0),
@@ -3316,8 +3507,14 @@ local function rodytiAktyvuma()
         else
             e = { d.data, "Negautas atsakymas", "-", "-", "-" }
         end
+        for _, v in ipairs((infoReiksmes(d))) do e[#e + 1] = v end
         for _, v in ipairs((darboReiksmes(d))) do e[#e + 1] = v end
+        if keitesi then
+            local zyme = isidarbino(d) and " (įsidarbino)" or (pasikeite and " (pasikeitė)" or "")
+            table.insert(e, 2, d.darboPav and (d.darboPav .. zyme) or "-")
+        end
         dienuEilutes[#dienuEilutes + 1] = e
+        raudonos[#dienuEilutes] = keitesi and (isidarbino(d) or pasikeite)
     end
     local dienu = math.max(1, #r.dienos)
     local sumuEilutes = {
@@ -3328,6 +3525,15 @@ local function rodytiAktyvuma()
           formatuotiSuma(math.floor((r.visoZuvys or 0) / dienu + 0.5)) .. " €",
           r.xpVidurkis and (xpPokytis(r.xpVidurkis) .. " XP") or "-" },
     }
+    for _, st in ipairs(infoSt) do
+        local reiksmes = {}
+        for _, d in ipairs(r.dienos) do
+            local _, pagal = infoReiksmes(d)
+            if pagal[st] then reiksmes[#reiksmes + 1] = pagal[st] end
+        end
+        sumuEilutes[1][#sumuEilutes[1] + 1] = darboStatistika.sumuoti(reiksmes)
+        sumuEilutes[2][#sumuEilutes[2] + 1] = darboStatistika.sumuoti(reiksmes, dienu)
+    end
     for _, st in ipairs(darboSt) do
         local reiksmes = {}
         for _, d in ipairs(r.dienos) do
@@ -3337,9 +3543,25 @@ local function rodytiAktyvuma()
         sumuEilutes[1][#sumuEilutes[1] + 1] = darboStatistika.sumuoti(reiksmes)
         sumuEilutes[2][#sumuEilutes[2] + 1] = darboStatistika.sumuoti(reiksmes, dienu)
     end
+    -- stulpeliai: { pavadinimas, plotis (0 = automatiškai) }
+    local stulpeliai = {}
+    for i, st in ipairs(AKTYVUMO_STULPELIAI) do
+        stulpeliai[#stulpeliai + 1] = { st[1], (st[2] > 0 and st[2]) or ((#darboSt + #infoSt) > 0 and 150 or 0) }
+        if i == 1 and keitesi then
+            local w = imgui.CalcTextSize("Darbas").x
+            for _, e in ipairs(dienuEilutes) do w = math.max(w, imgui.CalcTextSize(tostring(e[2])).x) end
+            stulpeliai[#stulpeliai + 1] = { "Darbas", math.floor(w + 24) }
+        end
+    end
+    for _, st in ipairs(infoSt) do stulpeliai[#stulpeliai + 1] = { st, 110 } end
+    for _, st in ipairs(darboSt) do stulpeliai[#stulpeliai + 1] = { st, 0 } end
+    if keitesi then
+        for _, e in ipairs(sumuEilutes) do table.insert(e, 2, "") end
+    end
     local stulpeliuPav = {}
-    for _, st in ipairs(AKTYVUMO_STULPELIAI) do stulpeliuPav[#stulpeliuPav + 1] = st[1] end
-    for _, st in ipairs(darboSt) do stulpeliuPav[#stulpeliuPav + 1] = st end
+    for _, st in ipairs(stulpeliai) do stulpeliuPav[#stulpeliuPav + 1] = st[1] end
+    local darboEilute = paskDarbas and ("Darbas: " .. paskDarbas.darboPav
+        .. (paskDarbas.darboNuo and (" nuo " .. paskDarbas.darboNuo) or "")) or nil
     local xpPirma = "Patirtis pirmą dieną: " .. (r.xpPirma and (r.xpPirma .. " XP") or "nėra informacijos")
     local xpPaskutine = "Patirtis paskutinę dieną: " .. (r.xpPaskutine and (r.xpPaskutine .. " XP") or "nėra informacijos")
 
@@ -3348,8 +3570,9 @@ local function rodytiAktyvuma()
     TPilkas("Tikrinta: " .. tekst(a.tikrinta))
     imgui.SameLine()
     if imgui.SmallButton("Kopijuoti visą lentelę##akt") then
-        local tekstas = { "Aktyvumas: " .. tekst(a.antraste) .. (r.darbas and (", darbas: " .. r.darbas) or ""),
-                          table.concat(stulpeliuPav, " | ") }
+        local tekstas = { "Aktyvumas: " .. tekst(a.antraste) .. (r.darbas and (", darbo statistika: " .. r.darbas) or "") }
+        if darboEilute then tekstas[#tekstas + 1] = darboEilute .. (keitesi and " (per laikotarpį keitėsi)" or "") end
+        tekstas[#tekstas + 1] = table.concat(stulpeliuPav, " | ")
         for _, e in ipairs(dienuEilutes) do tekstas[#tekstas + 1] = table.concat(e, " | ") end
         for _, e in ipairs(sumuEilutes) do tekstas[#tekstas + 1] = table.concat(e, " | ") end
         tekstas[#tekstas + 1] = xpPirma
@@ -3363,6 +3586,13 @@ local function rodytiAktyvuma()
         imgui.SetTooltip("Arba spausk ant bet kurios eilutės, kad nukopijuotum tik ją")
     end
 
+    if darboEilute then
+        T(darboEilute)
+        if keitesi then
+            imgui.SameLine()
+            T("Per šį laikotarpį darbas keitėsi - raudonai pažymėtos dienos, kai įsidarbino ar pasikeitė.", SPALVA_RAUDONA)
+        end
+    end
     if r.darbas then
         T("Darbo statistika: " .. r.darbas, SPALVA_ZALIA)
         local nerasta = 0
@@ -3374,19 +3604,15 @@ local function rodytiAktyvuma()
     end
 
     imgui.BeginChild("##aktyvumas", imgui.ImVec2(0, 0), false)
-    lentelesStulpeliai(#stulpeliuPav, "##akt_lentele" .. #darboSt, true)
-    for i, pav in ipairs(stulpeliuPav) do
-        local st = AKTYVUMO_STULPELIAI[i]
-        if st then
-            local plotisSt = st[2] > 0 and st[2] or (#darboSt > 0 and 150 or 0)
-            if plotisSt > 0 then imgui.SetColumnWidth(i - 1, plotisSt) end
-        end
-        TPilkas(pav)
+    lentelesStulpeliai(#stulpeliai, "##akt_lentele" .. #stulpeliai, true)
+    for i, st in ipairs(stulpeliai) do
+        if st[2] > 0 and i < #stulpeliai then imgui.SetColumnWidth(i - 1, st[2]) end
+        TPilkas(st[1])
         imgui.NextColumn()
     end
     imgui.Separator()
 
-    for i, e in ipairs(dienuEilutes) do aktyvumoEilute(e, "d" .. i) end
+    for i, e in ipairs(dienuEilutes) do aktyvumoEilute(e, "d" .. i, raudonos[i]) end
     imgui.Separator()
     for i, e in ipairs(sumuEilutes) do aktyvumoEilute(e, "s" .. i) end
     stulpeliuPabaiga()
@@ -3909,6 +4135,106 @@ TURINYS.ef_mg = function() eventFondai.rodyti("mg") end
 TURINYS.ef_t  = function() eventFondai.rodyti("t") end
 TURINYS.ef_e  = function() eventFondai.rodyti("e") end
 
+-- skiltis "Užblokavimai"
+TURINYS.uzblokavimai = function()
+    local U = uzblokavimai
+    if not U.matomas then
+        U.matomas = true
+        U.atnaujinti()
+    end
+    T("Užblokavimai")
+    TPilkas(KOMANDOS.banai .. " - paskutiniai ban. Paspaudus užblokuotą: kopijuoti nicką arba atblokuoti, adminą - kopijuoti nicką.")
+    imgui.Separator()
+    if imgui.SmallButton("Atnaujinti##ub_atn") then U.atnaujinti() end
+    if nust.dev then
+        imgui.SameLine()
+        if imgui.SmallButton("Sugeneruoti (Dev)##ub_dev") then U.duomenys = U.atsitiktiniai() end
+    end
+    imgui.SameLine()
+    imgui.PushItemWidth(180)
+    imgui.InputText("Ieškoti nicko##ub_paieska", U.paieska, ffi.sizeof(U.paieska))
+    imgui.PopItemWidth()
+    if U.kraunama then TPilkas("Laukiama serverio atsakymo (" .. KOMANDOS.banai .. ")...") end
+    if U.klaida then T(U.klaida, SPALVA_RAUDONA) end
+    imgui.Separator()
+
+    local d = U.duomenys
+    if not d then
+        if not U.kraunama then TPilkas("Duomenų dar nėra. Spausk \"Atnaujinti\".") end
+        return
+    end
+    TPilkas(string.format("Gauta: %s   Įrašų: %d", tekst(d.gauta), #d.irasai))
+    if d.atsitiktiniai then T("Dev režimas: rodomi atsitiktiniai duomenys.", SPALVA_GELTONA) end
+
+    local paieska = skaityti(U.paieska):lower()
+    local function plotisSt(laukas, antraste)
+        local w = imgui.CalcTextSize(antraste).x
+        for _, e in ipairs(d.irasai) do w = math.max(w, imgui.CalcTextSize(e[laukas]).x) end
+        return math.floor(w + 24)
+    end
+    -- nickas paspaudžiamas (tik tikri nickai, be tarpų)
+    local function nickas(vardas, raktas, uzblokuotas)
+        if not eventFondai.zaidejas(vardas) then TPilkas(vardas) return end
+        local dydis = imgui.CalcTextSize(vardas)
+        if imgui.Selectable(vardas .. "##" .. raktas, false, 0, imgui.ImVec2(dydis.x, 0)) then
+            U.meniu = { nickas = vardas, uzblokuotas = uzblokuotas }
+            U.atidarytiMeniu = true
+        end
+        if imgui.IsItemHovered() then
+            imgui.SetTooltip(uzblokuotas and "Spausk: kopijuoti nicką, atblokuoti" or "Spausk: kopijuoti nicką")
+        end
+    end
+
+    imgui.BeginChild("##ub_lentele", imgui.ImVec2(0, 0), false)
+    lentelesStulpeliai(4, "##ub_st", true)
+    imgui.SetColumnWidth(0, plotisSt("zaidejas", "Žaidėjas"))
+    imgui.SetColumnWidth(1, plotisSt("adminas", "Admin"))
+    imgui.SetColumnWidth(2, plotisSt("data", "Data"))
+    TPilkas("Žaidėjas") imgui.NextColumn()
+    TPilkas("Admin") imgui.NextColumn()
+    TPilkas("Data") imgui.NextColumn()
+    TPilkas("Priežastis") imgui.NextColumn()
+    imgui.Separator()
+    for i, e in ipairs(d.irasai) do
+        if paieska == "" or e.zaidejas:lower():find(paieska, 1, true) or e.adminas:lower():find(paieska, 1, true) then
+            nickas(e.zaidejas, "ub_z" .. i, true) imgui.NextColumn()
+            nickas(e.adminas, "ub_a" .. i, false) imgui.NextColumn()
+            T(e.data) imgui.NextColumn()
+            T(e.priezastis) imgui.NextColumn()
+        end
+    end
+    stulpeliuPabaiga()
+    imgui.EndChild()
+end
+
+-- Užblokavimai: nicko meniu (piešiamas pagrindinio lango lygyje)
+function uzblokavimai.langai()
+    local U = uzblokavimai
+    if U.atidarytiMeniu then
+        imgui.OpenPopup("##ub_nick_meniu")
+        U.atidarytiMeniu = false
+    end
+    if imgui.BeginPopup("##ub_nick_meniu") then
+        local m = U.meniu
+        if m then
+            T(m.nickas)
+            TPilkas(m.uzblokuotas and "Užblokuotas žaidėjas" or "Administratorius")
+            imgui.Separator()
+            if imgui.Button("Kopijuoti nicką", imgui.ImVec2(220, 0)) then
+                imgui.CloseCurrentPopup()
+                kopijavimas.kopijuoti(m.nickas, "ub_nickas")
+            end
+            if m.uzblokuotas and spalvotasMygtukas("Atblokuoti", MYGTUKAS_RAUDONAS, imgui.ImVec2(220, 0)) then
+                imgui.CloseCurrentPopup()
+                local vardas = m.nickas
+                paklausti(string.format("Ar tikrai nori atblokuoti %s?\nBus išsiųsta: %s", vardas,
+                    string.format(KOMANDOS.atblokuoti, vardas)), function() U.atblokuoti(vardas) end)
+            end
+        end
+        imgui.EndPopup()
+    end
+end
+
 -- Event: nicko meniu ir "Duoti pinigų" langas (piešiami pagrindinio lango lygyje)
 function eventFondai.langai()
     local E = eventFondai
@@ -4158,7 +4484,7 @@ local function nickoVeiksmai(nm)
         if nm.atsitiktiniai then
             local nuo, iki = datosLaikas(skaityti(ui.aktNuo)), datosLaikas(skaityti(ui.aktIki))
             if not (nuo and iki and iki >= nuo) then nuo, iki = nil, nil end
-            atsitiktiniai.aktyvumas = atsitiktinisAktyvumas(nm.nickas, nuo, iki, nm.darbas)
+            atsitiktiniai.aktyvumas = atsitiktinisAktyvumas(nm.nickas, nuo, iki)
             atsitiktiniai.aktyvumasPirmenybe = true
             aktyvumasNickui(nm.nickas)
         else
@@ -4193,6 +4519,8 @@ imgui.OnFrame(function() return ui.atidarytas[0] end, function()
     end
     if ui.skirtukas == "statusas" and not rodytiStatusoPunkta() then ui.skirtukas = "pagrindinis" end
     if not tostring(ui.skirtukas):find("^ef_") then eventFondai.matomas = false end
+    if ui.skirtukas ~= "direktoriai" then ui.direktMatomas = false end
+    if ui.skirtukas ~= "uzblokavimai" then uzblokavimai.matomas = false end
 
     -- kairysis meniu
     local apaciosAukstis = imgui.GetTextLineHeightWithSpacing() + 10
@@ -4257,6 +4585,7 @@ imgui.OnFrame(function() return ui.atidarytas[0] end, function()
     end
 
     eventFondai.langai()
+    uzblokavimai.langai()
 
     -- patvirtinimo langas
     if ui.atidarytiPatvirtinima then
