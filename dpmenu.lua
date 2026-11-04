@@ -1,6 +1,6 @@
 script_name("DPKT meniu")
 script_author("Dex")
-script_version("2.13.1")
+script_version("2.14.0")
 
 require "lib.moonloader"
 local sampev = require "lib.samp.events"
@@ -159,8 +159,6 @@ local FAILAI = {
     fondai      = DUOMENU_APLANKAS .. "\\fondai.json",
     aktyvumas   = DUOMENU_APLANKAS .. "\\aktyvumas.json",
     nustatymai  = DUOMENU_APLANKAS .. "\\nustatymai.json",
-    zurnalas    = DUOMENU_APLANKAS .. "\\debug_visidarbuotojai.txt",
-    ispejimai   = DUOMENU_APLANKAS .. "\\debug_ispejimai.txt",
     atnaujinta  = DUOMENU_APLANKAS .. "\\atnaujinta.txt",   -- po atnaujinimo: iš kurios versijos
 }
 
@@ -182,7 +180,8 @@ local NUMATYTI_NUSTATYMAI = {
     slepti = true,               -- slėpti chate eilutes, kurias renka scriptas
     chate = false,               -- pranešimus rodyti ir chate (ne tik skiltyje "Statusas")
     pasveikinimas = true,        -- "DPKT meniu įkeltas" žinutė
-    zurnalas = true,             -- /visidarbuotojai rinkimo output į failą (derinimui)
+    zurnalas = false,            -- derinimo žurnalas (config\dpkt\zurnalai), pagal nutylėjimą išjungtas
+    nustVersija = 2,             -- nustatymų failo versija (senų nustatymų perkėlimui)
     autoAtnaujinimai = true,     -- įkėlus scriptą tikrinti GitHub ir atsinaujinti
 }
 local nust = {}
@@ -204,6 +203,11 @@ local function ikeltiNustatymus()
             for k, v in pairs(d) do
                 if NUMATYTI_NUSTATYMAI[k] ~= nil and type(v) == type(NUMATYTI_NUSTATYMAI[k]) then nust[k] = v end
             end
+            -- 2 versija: derinimo žurnalas pagal nutylėjimą išjungtas - senuose nustatymuose jį išjungiam
+            if (tonumber(d.nustVersija) or 1) < 2 then
+                nust.zurnalas = false
+                nustatymaiPakeisti = true
+            end
         end
     end
     pritaikytiNustatymus()
@@ -224,6 +228,59 @@ local ZALIA   = 0x33AA33
 local RAUDONA = 0xFF0000
 
 -- ltu(), bet niekada negrąžina nil
+-- Derinimo žurnalas (Nustatymai, pagal nutylėjimą išjungtas). Kai įjungtas, į
+-- moonloader\config\dpkt\zurnalai\MMMM-MM-DD.txt rašoma: scripto komandos, serverio atsakymai
+-- (chatas ir langai) patikrų metu ir kelias sekundes po kiekvienos scripto komandos, statuso
+-- pranešimai, patikrų pradžia ir pabaiga. Įrašai kaupiami ir kas sekundę prirašomi į failą,
+-- seni (senesni nei 7 d.) failai ištrinami.
+local derinimas = { APLANKAS = DUOMENU_APLANKAS .. "\\zurnalai", DIENU = 7, buferis = {}, iki = 0, patikra = nil }
+
+-- ar dabar rašyti serverio output'ą (vyksta patikra arba ką tik išsiųsta scripto komanda)
+function derinimas.aktyvus()
+    return nust.zurnalas and (derinimas.patikra ~= nil or localClock() < derinimas.iki)
+end
+
+-- tekstas: UTF-8 iš scripto, cp = true - cp1257 iš serverio
+function derinimas.rasyti(tekstas, cp)
+    if not nust.zurnalas then return end
+    tekstas = tostring(tekstas or "")
+    if cp then
+        local pavyko, r = pcall(u8, tekstas)
+        tekstas = pavyko and r or tekstas
+    end
+    derinimas.buferis[#derinimas.buferis + 1] = string.format("[%s.%03d] %s", os.date("%H:%M:%S"),
+        math.floor((localClock() % 1) * 1000), tekstas)
+end
+
+function derinimas.issaugoti()
+    if #derinimas.buferis == 0 then return end
+    for _, a in ipairs({ getWorkingDirectory() .. "\\config", DUOMENU_APLANKAS, derinimas.APLANKAS }) do
+        if not doesDirectoryExist(a) then createDirectory(a) end
+    end
+    local f = io.open(derinimas.APLANKAS .. "\\" .. os.date("%Y-%m-%d") .. ".txt", "a")
+    if not f then return end
+    f:write(table.concat(derinimas.buferis, "\n"), "\n")
+    f:close()
+    derinimas.buferis = {}
+end
+
+-- ištrina senesnius nei 7 d. žurnalus (visus = true - visus)
+function derinimas.valyti(visus)
+    pcall(function()
+        local riba = os.date("%Y-%m-%d", os.time() - derinimas.DIENU * 86400)
+        local trinti = {}
+        local h, failas = findFirstFile(derinimas.APLANKAS .. "\\*.txt")
+        while failas do
+            local data = failas:match("^(%d%d%d%d%-%d%d%-%d%d)%.txt$")
+            if data and (visus or data < riba) then trinti[#trinti + 1] = failas end
+            failas = findNextFile(h)
+        end
+        if h then findClose(h) end
+        for _, x in ipairs(trinti) do os.remove(derinimas.APLANKAS .. "\\" .. x) end
+    end)
+    if visus then derinimas.buferis = {} end
+end
+
 local function saugusLtu(tekstas)
     tekstas = tostring(tekstas or "")
     local pavyko, rezultatas = pcall(ltu, tekstas)
@@ -249,6 +306,7 @@ local function statusoIrasas(tekstas, tipas)
     statusas.irasai[#statusas.irasai + 1] = e
     if #statusas.irasai > MAX_STATUSO_IRASU then table.remove(statusas.irasai, 1) end
     statusas.slinkti = true
+    if tipas ~= "serveris" then derinimas.rasyti("STATUSAS [" .. tipas .. "] " .. e.tekstas) end
     if tipas ~= "antraste" and tipas ~= "serveris" then
         statusas.naujas = { tekstas = e.tekstas, tipas = tipas, t = localClock() }
         if nust.chate then
@@ -263,44 +321,6 @@ local function perspejimas()
     statusoIrasas("Rekomenduojama nedaryti jokių veiksmų (teleportų ar pnš.) kol vyksta patikra.", "ispejimas")
 end
 
--- Derinimo žurnalas: kol renkami visų darbų /visidarbuotojai, čia kaupiamas visas
--- serverio output (chatas ir langai) ir scripto komandos. Išsaugoma į failą.
-local zurnalas = nil
-
--- laikas nuo rinkimo pradžios, sekundėmis (tikslumas iki ms)
-local function zurnaloLaikas()
-    return string.format("+%8.3f s", localClock() - (zurnalas.t0 or 0))
-end
-
--- tekstas: cp1257 iš serverio arba UTF-8 iš scripto (utf8 = true)
-local function zurnaloIrasas(tekstas, utf8)
-    if not zurnalas then return end
-    if not utf8 then
-        local pavyko, r = pcall(u8, tostring(tekstas or ""))
-        tekstas = pavyko and r or tostring(tekstas)
-    end
-    zurnalas.eilutes[#zurnalas.eilutes + 1] = "[" .. zurnaloLaikas() .. "] " .. tekstas
-end
-
-local function issaugotiZurnala(busenaTekstu)
-    if not zurnalas then return end
-    local z = zurnalas
-    zurnalas = nil
-    local config = getWorkingDirectory() .. "\\config"
-    if not doesDirectoryExist(config) then createDirectory(config) end
-    if not doesDirectoryExist(DUOMENU_APLANKAS) then createDirectory(DUOMENU_APLANKAS) end
-    local f = io.open(FAILAI.zurnalas, "w")
-    if not f then return end
-    f:write("DPKT meniu v" .. tostring(thisScript().version) .. " - /visidarbuotojai derinimo žurnalas\n")
-    f:write("Pradėta: " .. z.pradzia .. ", baigta: " .. os.date("%Y-%m-%d %H:%M:%S") .. ", būsena: " .. busenaTekstu .. "\n")
-    f:write("Nickas: " .. tostring(z.nickas) .. ", data: " .. tostring(z.data or "-") .. "\n")
-    f:write("Formatas: [+sekundės nuo pradžios] > komanda | CHAT [žymė] 0xSPALVA | tekstas | DIALOG ...\n")
-    f:write("Žymės: [ATPAŽINTA] eilutė suskaidyta į laukus, [NUKIRPTA] chato eilutė nukirpta, galas imamas iš lango\n")
-    f:write(string.rep("=", 70) .. "\n")
-    for _, e in ipairs(z.eilutes) do f:write(e, "\n") end
-    f:close()
-    pranesimas("Derinimo žurnalas: moonloader\\config\\dpkt\\debug_visidarbuotojai.txt")
-end
 
 -- Paskutinė scripto išsiųsta komanda: jei serveris atsako "Tokios komandos nėra",
 -- žinom, kuriai komandai trūksta prieigos.
@@ -308,7 +328,8 @@ local prieiga = { klaida = nil, komanda = nil, laikas = 0 }
 
 -- UTF-8 tekstas -> serveriui (cp1257)
 local function siusti(komanda)
-    zurnaloIrasas("> " .. komanda, true)
+    derinimas.rasyti("> " .. komanda)
+    derinimas.iki = math.max(derinimas.iki, localClock() + LAUKTI_ILGIAUSIAI + 2)
     prieiga.komanda, prieiga.laikas = komanda, localClock()
     sampSendChat(saugusLtu(komanda))
 end
@@ -414,6 +435,8 @@ local eiga = { tekstas = nil, dabar = 0, viso = 0 }
 local function pradetiEiga(tekstas, viso, rodytiStatusa)
     eiga.tekstas, eiga.dabar, eiga.viso = tekstas, 0, viso
     statusas.patikra = { pavadinimas = tekstas, pradzia = os.date("%H:%M:%S"), t0 = localClock(), busena = "vyksta" }
+    derinimas.patikra = tekstas
+    derinimas.rasyti("========== PRADŽIA: " .. tekstas .. " ==========")
     statusoIrasas(tekstas, "antraste")
     if rodytiStatusa then statusas.perjungti = true end
 end
@@ -425,7 +448,10 @@ local function baigtiEiga(busena)
     if p and p.busena == "vyksta" then
         p.busena = busena or "baigta"
         p.trukme = localClock() - p.t0
+        derinimas.rasyti(string.format("========== PABAIGA: %s - %s, %.1f s ==========", p.pavadinimas, p.busena, p.trukme))
     end
+    derinimas.patikra = nil
+    derinimas.iki = localClock() + 3   -- dar kelias sekundes rašom vėluojančius atsakymus
 end
 
 -- Duomenys atmintyje (kad nereiktų kas kadrą skaityti failų)
@@ -1164,11 +1190,11 @@ local rinkimas = {
 local TOKIOS_KOMANDOS_NERA = ltu("Tokios komandos nėra")
 
 function sampev.onServerMessage(spalva, tekstas)
-    if zurnalas then
+    if derinimas.aktyvus() then
         local zyme = ""
         local d = atpazintiDarbuotoja(tekstas)
         if d then zyme = d.nukirpta and " [NUKIRPTA]" or " [ATPAŽINTA]" end
-        zurnaloIrasas(string.format("CHAT%s 0x%08X | %s", zyme, (tonumber(spalva) or 0) % 0x100000000, tostring(tekstas)))
+        derinimas.rasyti(string.format("CHAT%s 0x%08X | %s", zyme, (tonumber(spalva) or 0) % 0x100000000, tostring(tekstas)), true)
     end
 
     -- serverio atsakymai į scripto /skirtidir ir /skirtipav (paskyrimas, nuėmimas) slepiami
@@ -1252,15 +1278,12 @@ end
 local atidarytiMeniu
 
 function sampev.onShowDialog(id, stilius, antraste, mygtukas1, mygtukas2, tekstas)
-    if zurnalas then
-        zurnaloIrasas(string.format("DIALOG id=%s stilius=%s mygtukai=[%s|%s] antraštė: %s",
-            tostring(id), tostring(stilius), tostring(mygtukas1), tostring(mygtukas2), tostring(antraste)))
-        zurnalas.eilutes[#zurnalas.eilutes + 1] = "    --- lango tekstas ---"
+    if derinimas.aktyvus() then
+        derinimas.rasyti(string.format("DIALOG id=%s stilius=%s mygtukai=[%s|%s] antraštė: %s",
+            tostring(id), tostring(stilius), tostring(mygtukas1), tostring(mygtukas2), tostring(antraste)), true)
         for eilute in (tostring(tekstas) .. "\n"):gmatch("(.-)\n") do
-            local pavyko, r = pcall(u8, eilute)
-            zurnalas.eilutes[#zurnalas.eilutes + 1] = "    " .. (pavyko and r or eilute)
+            derinimas.rasyti("    | " .. eilute, true)
         end
-        zurnalas.eilutes[#zurnalas.eilutes + 1] = "    --- lango pabaiga ---"
     end
 
     -- ar langą užklausė pats scriptas (mygtukas DPKT meniu) - tada visada rodom meniu lange
@@ -1360,7 +1383,7 @@ local function nutrauktiPatikra(as)
         pranesimas("Nuimiau direktorių.")
     end
     klaida("Patikra nutraukta.")
-    issaugotiZurnala("nutraukta (" .. tostring(prieiga.klaida) .. ")")
+    derinimas.rasyti("Nutraukta: nėra prieigos prie " .. tostring(prieiga.klaida))
     uzimtas = false
     baigtiEiga("nutraukta")
 end
@@ -1498,23 +1521,6 @@ function ispejimai.lentele(r)
     return t
 end
 
--- neapdorotas serverio atsakymas į failą, kad būtų galima patobulinti atpažinimą
-function ispejimai.issaugotiDerinima(nickas, darbas, r)
-    if not nust.zurnalas then return end
-    local f = io.open(FAILAI.ispejimai, "w")
-    if not f then return end
-    local function utf(x) local pavyko, u = pcall(u8, tostring(x or "")) return pavyko and u or tostring(x) end
-    f:write("DPKT meniu v" .. tostring(thisScript().version) .. " - /ispejimai derinimo žurnalas\n")
-    f:write("Laikas: " .. os.date("%Y-%m-%d %H:%M:%S") .. ", nickas: " .. nickas .. ", darbas: " .. darbas .. "\n")
-    f:write(string.rep("=", 70) .. "\n")
-    for _, e in ipairs(r.eilutes) do f:write("CHAT | " .. utf(e) .. "\n") end
-    if r.langas then
-        f:write(string.format("DIALOG stilius=%s antraštė: %s\n", tostring(r.langas.stilius), utf(r.langas.antraste)))
-        for e in (tostring(r.langas.tekstas) .. "\n"):gmatch("(.-)\n") do f:write("    " .. utf(e) .. "\n") end
-    end
-    if not r.langas and #r.eilutes == 0 then f:write("(serveris neatsakė)\n") end
-    f:close()
-end
 
 -- darbas: { pavadinimas, id }; atsitiktinai = Dev režimo atsitiktiniai duomenys (be serverio)
 function ispejimai.tikrinti(nickas, darbas, atsitiktinai)
@@ -1562,7 +1568,6 @@ function ispejimai.tikrinti(nickas, darbas, atsitiktinai)
         if prieiga.klaida then return nutraukti() end
         local r = rinkimas.ispejimai or { eilutes = {} }
         rinkimas.ispejimai = nil
-        ispejimai.issaugotiDerinima(nickas, darbas.pavadinimas, r)
         if r.langas or #r.eilutes > 0 then
             L.lentele, L.busena = ispejimai.lentele(r), "gauta"
         else
@@ -2032,10 +2037,6 @@ local function rinktiDarbuotojus(data)
     uzimtas = true
     pradetiEiga(data and ("Renkami darbuotojai už " .. data) or "Renkami darbuotojai", #DIREKTORIU_DARBAI, true)
     prieiga.klaida = nil
-    if nust.zurnalas then
-        zurnalas = { pradzia = os.date("%Y-%m-%d %H:%M:%S"), t0 = localClock(), nickas = as, eilutes = {},
-                     data = data or "šiandien" }
-    end
     lua_thread.create(function()
         local rezultatas = { darbai = {} }
         perspejimas()
@@ -2072,11 +2073,8 @@ local function rinktiDarbuotojus(data)
         for i, darbas in ipairs(DIREKTORIU_DARBAI) do
             eiga.dabar = i - 1
             eiga.tekstas = "Renkami darbuotojai: " .. darbas.pavadinimas
-            if zurnalas then
-                zurnalas.eilutes[#zurnalas.eilutes + 1] = ""
-                zurnalas.eilutes[#zurnalas.eilutes + 1] = string.format("========== %d/%d  %s (direktoriaus ID %d) ==========",
-                    i, #DIREKTORIU_DARBAI, darbas.pavadinimas, darbas.id)
-            end
+            derinimas.rasyti(string.format("---------- %d/%d  %s (direktoriaus ID %d) ----------",
+                i, #DIREKTORIU_DARBAI, darbas.pavadinimas, darbas.id))
             siusti(string.format(KOMANDOS.direktorius, as, darbas.id))
             pranesimas(string.format("Skyrei sau %s direktorių patikrinti /visidarbuotojai%s (%d/%d).",
                 darbas.pavadinimas, data and (" " .. data) or "", i, #DIREKTORIU_DARBAI))
@@ -2108,16 +2106,16 @@ local function rinktiDarbuotojus(data)
                 pavadinimas = darbas.pavadinimas, id = darbas.id,
                 eilutes = eilutes, surinkta = os.date("%Y-%m-%d %H:%M"),
             }
-            if zurnalas then
+            if nust.zurnalas then
                 local pilnos, nukirptos, isLango = 0, 0, 0
                 for _, e in ipairs(eilutes) do
                     if e.isLango then isLango = isLango + 1
                     elseif e.nukirpta then nukirptos = nukirptos + 1
                     else pilnos = pilnos + 1 end
                 end
-                zurnalas.eilutes[#zurnalas.eilutes + 1] = string.format(
+                derinimas.rasyti(string.format(
                     "---------- Rezultatas: %d pilnos, %d nukirptos (papildyta iš lango), %d tik iš lango, langas: %s ----------",
-                    pilnos, nukirptos, isLango, rinkimas.darbuotojai.langas and "gautas" or "negautas")
+                    pilnos, nukirptos, isLango, rinkimas.darbuotojai.langas and "gautas" or "negautas"))
             end
             rinkimas.darbuotojai = nil
         end
@@ -2133,7 +2131,6 @@ local function rinktiDarbuotojus(data)
         else
             klaida("Nepavyko išsaugoti informacijos į diską.")
         end
-        issaugotiZurnala("baigta")
         uzimtas = false
         baigtiEiga()
     end)
@@ -2632,6 +2629,12 @@ end
 -- Po kiekvieno atnaujinimo čia pridedamas naujas įrašas (ir pakeičiamas script_version).
 -- Versijų istorija (naujausia viršuje). Rodoma skiltyje „Pakeitimai“.
 local PAKEITIMAI = {
+    { versija = "2.14.0", pavadinimas = "Naujas derinimo žurnalas", pakeitimai = {
+        "Derinimo žurnalas veikia visoms patikroms, ne tik /visidarbuotojai: scripto komandos, serverio atsakymai (chatas ir langai), statuso pranešimai, patikrų pradžia ir pabaiga.",
+        "Rašoma į moonloader\\config\\dpkt\\zurnalai\\MMMM-MM-DD.txt (vienas failas per dieną), senesni nei 7 d. ištrinami automatiškai. Nustatymuose – „Ištrinti žurnalus“.",
+        "Serverio output'as rašomas tik patikrų metu ir kelias sekundes po scripto komandų – kitų žaidėjų chatas nesirenka.",
+        "Pagal nutylėjimą išjungtas; jei buvo įjungtas, atnaujinus išjungiamas (įjungti galima Nustatymuose).",
+    } },
     { versija = "2.13.1", pakeitimai = {
         "Atnaujinimų apsauga: parsiųstas scriptas įdiegiamas tik tada, kai jo versija sutampa su version.json (kitaip atnaujinimas atšaukiamas).",
     } },
@@ -3910,7 +3913,11 @@ local function rodytiNustatymus()
 
     skyrius("Duomenys")
     zymimasis("dev", "Dev režimas", "atsitiktiniai duomenys, kol nėra tikrų")
-    zymimasis("zurnalas", "Derinimo žurnalas", "visas /visidarbuotojai output į debug_visidarbuotojai.txt")
+    zymimasis("zurnalas", "Derinimo žurnalas", "komandos ir serverio atsakymai į config\\dpkt\\zurnalai, saugoma 7 d.")
+    if imgui.SmallButton("Ištrinti žurnalus##derinimas") then
+        derinimas.valyti(true)
+        pranesimas("Derinimo žurnalai ištrinti.")
+    end
     TPilkas("Be Dev režimo rodomi tik tikri duomenys. Jei jų nėra, prie darbų rodomi nuliai.")
     if nust.dev then
         if imgui.Button("Sugeneruoti naujus atsitiktinius duomenis") then atsitiktiniai = {} end
@@ -4965,6 +4972,10 @@ function main()
         pranesimas(tekstas)
     end
     if nust.autoAtnaujinimai then atnaujinimai.tikrinti(false) end
+    if nust.zurnalas then
+        derinimas.valyti(false)
+        derinimas.rasyti(string.format("==================== DPKT meniu v%s įkeltas ====================", tostring(thisScript().version)))
+    end
 
     -- nustatymai išsaugomi ne dažniau nei kas sekundę (kad slankikliai nerašytų failo kas kadrą)
     while true do
@@ -4973,5 +4984,11 @@ function main()
             nustatymaiPakeisti = false
             issaugotiNustatymus()
         end
+        derinimas.issaugoti()
     end
+end
+
+-- išjungiant ar perkraunant scriptą neprarandam paskutinių žurnalo įrašų
+function onScriptTerminate(skriptas)
+    if skriptas == thisScript() then pcall(derinimas.issaugoti) end
 end
