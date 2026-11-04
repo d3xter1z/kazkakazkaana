@@ -1,6 +1,6 @@
 script_name("DPKT meniu")
 script_author("Dex")
-script_version("2.13.0")
+script_version("2.13.1")
 
 require "lib.moonloader"
 local sampev = require "lib.samp.events"
@@ -1999,6 +1999,16 @@ function atnaujinimai.tikrinti(rankiniu)
             klaida("Parsiųstas failas sugadintas, palieku dabartinę versiją.")
             return
         end
+        -- failo versija turi sutapti su version.json (kitaip GitHub'e failas dar senas ar įkeltas ne tas)
+        local failoVersija = turinys:match('script_version%("([^"]+)"%)')
+        if failoVersija ~= nauja then
+            os.remove(tmp)
+            A.busena, A.vyksta = string.format("GitHub'e failas v%s, o version.json v%s - atnaujinimas atšauktas.",
+                tostring(failoVersija), nauja), false
+            klaida(string.format("Parsiųsto failo versija (v%s) nesutampa su v%s, palieku dabartinę versiją.",
+                tostring(failoVersija), nauja))
+            return
+        end
         os.remove(kelias .. ".bak")
         os.rename(kelias, kelias .. ".bak")
         if not os.rename(tmp, kelias) then
@@ -2622,6 +2632,9 @@ end
 -- Po kiekvieno atnaujinimo čia pridedamas naujas įrašas (ir pakeičiamas script_version).
 -- Versijų istorija (naujausia viršuje). Rodoma skiltyje „Pakeitimai“.
 local PAKEITIMAI = {
+    { versija = "2.13.1", pakeitimai = {
+        "Atnaujinimų apsauga: parsiųstas scriptas įdiegiamas tik tada, kai jo versija sutampa su version.json (kitaip atnaujinimas atšaukiamas).",
+    } },
     { versija = "2.13.0", pavadinimas = "Užblokavimai", pakeitimai = {
         "Nauja skiltis „Užblokavimai“ (Įrankiai): atidarius automatiškai siunčiamas /bans, serverio langas paslepiamas, rodoma lentelė Žaidėjas | Admin | Data | Priežastis su paieška.",
         "Paspaudus užblokuotą žaidėją: Kopijuoti nicką arba Atblokuoti (su patvirtinimu, /unban nickas, po to sąrašas atnaujinamas). Paspaudus adminą: Kopijuoti nicką.",

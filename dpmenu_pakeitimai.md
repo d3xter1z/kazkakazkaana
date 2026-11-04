@@ -4,6 +4,9 @@ Autorius: Dex. Naujausia versija viršuje.
 
 Versijos: 1 – dialogų versija, 2 – mimgui. 2.x.x: vidurinis skaičius keičiasi su didesniais pakeitimais, paskutinis – su smulkiais.
 
+## 2.13.1
+- Atnaujinimų apsauga: parsiųstas scriptas įdiegiamas tik tada, kai jo versija sutampa su version.json (kitaip atnaujinimas atšaukiamas).
+
 ## 2.13.0 – Užblokavimai
 - Nauja skiltis „Užblokavimai“ (Įrankiai): atidarius automatiškai siunčiamas /bans, serverio langas paslepiamas, rodoma lentelė Žaidėjas | Admin | Data | Priežastis su paieška.
 - Paspaudus užblokuotą žaidėją: Kopijuoti nicką arba Atblokuoti (su patvirtinimu, /unban nickas, po to sąrašas atnaujinamas). Paspaudus adminą: Kopijuoti nicką.
