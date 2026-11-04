@@ -1,0 +1,156 @@
+# DPKT meniu – pakeitimų istorija
+
+Autorius: Dex. Naujausia versija viršuje.
+
+Versijos: 1 – dialogų versija, 2 – mimgui. 2.x.x: vidurinis skaičius keičiasi su didesniais pakeitimais, paskutinis – su smulkiais.
+
+## 2.11.0 – Automatiniai atnaujinimai
+- Įkėlus scriptą tikrinama GitHub (d3xter1z/kazkakazkaana) ir, jei yra naujesnė versija, ji parsisiunčiama ir įdiegiama automatiškai.
+- Parsiųstas failas patikrinamas (ar užsikrauna), senas išsaugomas kaip dpmenu.lua.bak, sugadintas atnaujinimas neįdiegiamas.
+- Po atnaujinimo chate ir statuse parašoma, iš kurios į kurią versiją atnaujinta.
+- Nustatymuose: „Automatiniai atnaujinimai“ ir „Tikrinti atnaujinimus dabar“.
+
+## 2.10.4
+- Fondų išrašuose „JS mafia_blist“ (serverio vidinis įrašas) ir kiti įrašai su tarpais rodomi pilkai ir nepaspaudžiami, jiems pinigų duoti neleidžiama.
+
+## 2.10.3
+- Nustatymuose varnelė „/noriudarbo be ID atidaro „Pakeisti darbą““, pagal nutylėjimą išjungta – pirmenybė serverio komandai.
+
+## 2.10.2
+- Parašius /noriudarbo (be ID) atsidaro „Pakeisti darbą“. Su ID komanda keliauja serveriui kaip anksčiau.
+
+## 2.10.1
+- „Event“ dabar atskira meniu grupė su trimis skiltimis: Mafijų, gaujų fondas, Teisėsaugos fondas, Event fondas. Atidarius skiltį jos fondas užklausiamas automatiškai.
+
+## 2.10.0 – Event skiltis
+- Event fondai: Mafijų, gaujų (/mgfondas), Teisėsaugos (/tfondas) ir Event (/efondas).
+- Atidarius skiltį ar pasirinkus fondą komanda išsiunčiama automatiškai, serverio langas ir chato eilutė paslepiami, duomenys rodomi lentelėje: likutis, įplaukos, išlaidos, Data | Vardas | Suma.
+- Paspaudus nicką: Kopijuoti nicką arba Duoti pinigų iš fondo (/mgduoti, /tduoti, /eduoti). Tikrinama, ar fonde pakanka pinigų, po davimo fondas atnaujinamas.
+- Paieška pagal nicką ir „Sugeneruoti (Dev)“.
+
+## 2.9.0 – Pakeitimų skiltis
+- Nauja skiltis „Pakeitimai“ su visa versijų istorija.
+- Versijos pernumeruotos: 1 – dialogų versija, 2 – mimgui. 2.x.x: vidurinis skaičius – didesni pakeitimai, paskutinis – smulkūs.
+- Atidarius meniu 1 iš 10 kartų Pagrindiniame vietoj palinkėjimo šypsotis raudonai rašoma „Kas skaitys tas GD“.
+
+## 2.8.3
+- Nauji „Pakeisti darbą“ ID (17 darbų): Policininkų 1, Medikų 2, Cosa Nostra 6, Tolimųjų reisų 7, FTB 9, Mechanikų 12, Ginklų prekeivių 15, Reporterių 16, Taksi 21, Immortal 26, Interpolo 27, Apsaugos 28, Armijos 29, Radijos 32, SPD 33, „Grove Street“ 34, „The Ballas“ 35.
+
+## 2.8.2
+- Atimant direktoriaus statusą tikrinama, ar jis prisijungęs. Jei ne – naudojama /skirtidiroff <nick> 0.
+
+## 2.8.1
+- Darbo analizė atbuline data: neaktyvumas skaičiuojamas nuo pasirinktos datos.
+- Jei praeitos dienos sąraše nėra Įspėjimų ar Priimtas stulpelių, rašoma „nėra duomenų“.
+
+## 2.8.0 – Darbo analizė
+- Darbų patikroje vienas mygtukas „Tikrinti“ (/dfondas + /visidarbuotojai).
+- Po patikros atsidaro langas „Darbo analizė“: fondas, darbuotojai, direktorius ir pavaduotojas, neaktyvūs, su įspėjimais, nauji, daugiausiai dirbę, rodiklių sumos ir vidurkiai, darbuotojų lentelė su nicko meniu.
+- Datos pasirinkimas ir „Sugeneruoti (Dev)“.
+- Paslėpti /skirtidir atsakymai, ateinantys jau po patikros, ir tuščios eilutės po scripto komandų.
+
+## 2.7.6
+- Pridėtas SPD (ID 20) prie „Pakeisti darbą“.
+
+## 2.7.5
+- Nauji „Pakeisti darbą“ ID (18 darbų, su abiem Taksi firmomis, Narkotikų prekeiviais, Reporteriais).
+
+## 2.7.4
+- Pavaduotojo statusas atimamas per to darbo direktorių (/skirtipav <nick>), po to atnaujinama /direkt.
+
+## 2.7.3
+- Įspėjimų istorija pagal tikrą serverio langą: santrauka „įspėtas direktoriaus N kartų“ ir lentelė Data | Priežastis | Davė.
+
+## 2.7.2
+- Įspėjimų istorijoje tekstas nebenusikerpa: stulpeliai pagal turinį, langas praplatėja, jei reikia – horizontali slinktis.
+
+## 2.7.1
+- Dev režime tikra aktyvumo patikra nebeužgožiama senų atsitiktinių duomenų.
+
+## 2.7.0 – Darbo statistika aktyvume
+- Aktyvumo patikra renka ir darbo statistiką kiekvienai dienai (baudos, atvykimai, pagydymai ir t.t.) per /visidarbuotojai <data>.
+- Sumos ir vidurkiai, darbas parenkamas automatiškai arba rankiniu būdu.
+
+## 2.6.2
+- Direktoriuose: „Kopijuoti direktoriaus nicką“, „Kopijuoti pavaduotojo nicką“.
+
+## 2.6.1
+- Mažiausias lango dydis 1300x750 (mažesniame ekrane – visas ekranas).
+
+## 2.6.0 – Nicko meniu ir įspėjimų istorija
+- Darbuotojų lentelėje nickai paspaudžiami: Tikrinti žaidėjo aktyvumą, Žaidėjo įspėjimų istorija (/ispejimai per to darbo direktorių, atskirame lange), Kopijuoti nicką.
+- Veikia ir su atsitiktiniais duomenimis.
+
+## 2.5.7
+- Aktyvumo eilutės kopijuojamos paspaudus, mygtukas „Kopijuoti visą lentelę“.
+
+## 2.5.6
+- Su nuimta /arsutapo varnele scriptas komandos neliečia.
+
+## 2.5.5
+- /arsutapo be paskyrų atidaro Paskyrų sutapimo skiltį, su vienu nicku jį įrašo į laukelį.
+
+## 2.5.4
+- Serverio atsakymo laukimas pagal nutylėjimą 2 s.
+
+## 2.5.3
+- /direkt ir /arsutapo nustatymai atskirti: /direkt pagal nutylėjimą rodo serverio lentelę, mygtukai meniu visada atnaujina meniu.
+
+## 2.5.2
+- Lentelės nebesubyra tempiant stulpelių ribas.
+- Pagrindiniame puslapyje tekstas nebenusikerpa, nicko stulpelis prisitaiko prie ilgiausio nicko.
+
+## 2.5.1
+- Patikros metu serverio atsakymai į /skirtidir slepiami chate ir rodomi statuse.
+
+## 2.5.0 – Patikros statusas
+- Visos scripto žinutės perkeltos iš chato į skiltį „Patikros statusas“: eiga, trukmė, likęs laikas, perspėjimai ir visi pranešimai su laiku.
+- Chate liko tik įkėlimo žinutė, naujausias pranešimas kelias sekundes rodomas lango apačioje.
+- Nustatymas „Pranešimus rodyti ir chate“.
+
+## 2.4.2
+- Ryškesnės linijos, rėmeliai aplink laukus ir mygtukus, šviesesni pažymėjimai.
+
+## 2.4.1
+- Vaivorykštinė juosta pagal nutylėjimą išjungta, vietoj jos juoda pavadinimo juosta.
+
+## 2.4.0 – Direktorių žymės
+- Prieš renkant darbuotojus paimama /direkt lentelė: direktorius pažymimas (dir), pavaduotojas (pav).
+- Išimtas „Nr.“ stulpelis.
+
+## 2.3.2
+- Atsitiktiniai duomenys atnaujinti: kiekvieno darbo stulpeliai, praeitos dienos formatas.
+- Dev režime galima generuoti duomenis ir atbuline data.
+
+## 2.3.1
+- Pataisytas praeitos dienos formatas („Šiandien 431 203min“, „D. p. …€“, lango antraštė – data).
+
+## 2.3.0 – Darbuotojai pagal datą
+- /visidarbuotojai pagal datą: datos laukas su „Šiandien“ / „Vakar“.
+- Jei fondo nepavyko gauti, rašomas 0.
+
+## 2.2.1
+- Perrašytas /visidarbuotojai atpažinimas pagal tikrą serverio output'ą: kiekvieno darbo stulpeliai, nukirptos chato eilutės papildomos iš lango, poskyriai.
+
+## 2.2.0 – Nustatymai ir Dev režimas
+- Skiltis „Nustatymai“ su Dev režimu, nustatymai išsaugomi nustatymai.json.
+- Persijungimai rodomi tik tada, kai yra bendras IP arba SAMP ID, Dev sutapimo scenarijų mygtukai.
+- Failas pervadintas į dpmenu.lua, autorius Dex.
+- „Tokios komandos nėra“ – rašoma „Neturi prieigos prie komandos X“, patikra nutraukiama, direktorius nuimamas.
+- Derinimo žurnalas debug_visidarbuotojai.txt.
+
+## 2.1.0 – Paskyrų sutapimas
+- Nauja skiltis „Paskyrų sutapimas“ (/arsutapo): bendri IP, bendras SAMP ID, persijungimai tarp paskyrų ir spalvota išvada.
+
+## 2.0.0 – Perrašyta ant mimgui
+- Vietoj dialogų – vienas mimgui langas su skirtukais, juodas nepermatomas dizainas, apačioje „Made by Dex, with love, mua :3“.
+- Išimta „Mafijos/Gaujos“ skiltis, pridėtas „Pagrindinis“ puslapis.
+- Aktyvume prisijungusių žaidėjų sąrašas.
+
+## 1.x – Dialogų versija
+- Pirmoji versija buvo ant SA-MP dialogų (pradžioje vadinosi „mgdpkt“).
+- Mafijų ir gaujų užšaldymas, darbo /dfondas ir /visidarbuotojai per /skirtidir, /blist (tipai 1–4, 1–60 mėn.) su nicko patikra.
+- Pervadinta į DPKT meniu, komanda /dp, „Pakeisti darbą“ (/noriudarbo).
+- Visų darbų /visidarbuotojai ir /dfondas su išsaugojimu diske.
+- Aktyvumas per /info kiekvienai dienai, trumposios komandos /aktyvumas, /vdd, /vdf.
+- /direkt valdymas: direktoriai, pavaduotojai, jų aktyvumas ir statuso atėmimas.
