@@ -4,6 +4,16 @@ Autorius: Dex. Naujausia versija viršuje.
 
 Versijos: 1 – dialogų versija, 2 – mimgui. 2.x.x: vidurinis skaičius keičiasi su didesniais pakeitimais, paskutinis – su smulkiais.
 
+## 2.15.0 – Direktorių suvestinė ir žaidėjo profilis
+- Direktoriuose mygtukas „Savaitės suvestinė“: gauna /direkt ir kiekvienam direktoriui bei pavaduotojui patikrina /info už kiekvieną iš paskutinių 7 dienų. Atskirame lange: darbas, pareigos, nickas, minutės kiekvieną dieną ir iš viso; raudonai – mažiau nei 7 val. per 7 dienas. Galima rūšiuoti nuo mažiausiai žaidusių, kopijuoti, paspaudus nicką – „Kopijuoti nicką“.
+- Nauja skiltis „Žaidėjo profilis“ (Analizės įrankiai): visa /info informacija, įspėjimų istorija (per jo darbo direktorių) ir užblokavimai (/gautiban nickas, lentelė Data | Admin | Priežastis | Trukmė: „x H“ – laikinas ban x valandų, be trukmės – amžinas (raudonai); serverio langas paslepiamas). Jei nėra prieigos prie įspėjimų ar /gautiban, ta dalis praleidžiama, o likusi informacija vis tiek surenkama. Mygtukai „Kopijuoti nicką“, „Aktyvumas (7d.)“.
+- Direktoriuose prie pasirinkto darbo mygtukai „Direktoriaus / Pavaduotojo aktyvumas (7d.)“ ir „Direktoriaus / Pavaduotojo profilis“ – patikra prasideda iškart. Paspaudus nicką kitose lentelėse taip pat atsirado „Aktyvumas (7d.)“ ir „Žaidėjo profilis“.
+- Serverio atsakymas „Toks žaidėjas nežaidžia“ atpažįstamas: suvestinėje rodoma „Nežaidžia“ ir likusios dienos nebetikrinamos, profilyje parašoma, aktyvumo patikra nutraukiama.
+- Abiem – „Sugeneruoti (Dev)“.
+- „Žaidėjo profilis“ ir „Savaitės suvestinė“ pažymėti geltonu (WIP) – gali veikti netinkamai.
+- Jei patikra turėtų trukti (ar jau trunka) ilgiau nei 120 s, statuse parašoma „Geriau kavos eik pasiimt... užtruksim...“.
+- Greitesnės patikros: serverio atsakymo laukiama 0,5 s (buvo 2 s, seni nustatymai perkeliami), o pauzė tarp komandų skaičiuojama nuo išsiųstos komandos – atsakymo laukimas prie jos nebepridedamas. /info siunčiami kas 0,75 s, o ne kas ~2,75 s. Vėliau atėjęs /info atsakymas dar priimamas iki pauzės pabaigos.
+
 ## 2.14.0 – Backend changes
 - Backend changes.
 
