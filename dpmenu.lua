@@ -2629,11 +2629,8 @@ end
 -- Po kiekvieno atnaujinimo čia pridedamas naujas įrašas (ir pakeičiamas script_version).
 -- Versijų istorija (naujausia viršuje). Rodoma skiltyje „Pakeitimai“.
 local PAKEITIMAI = {
-    { versija = "2.14.0", pavadinimas = "Naujas derinimo žurnalas", pakeitimai = {
-        "Derinimo žurnalas veikia visoms patikroms, ne tik /visidarbuotojai: scripto komandos, serverio atsakymai (chatas ir langai), statuso pranešimai, patikrų pradžia ir pabaiga.",
-        "Rašoma į moonloader\\config\\dpkt\\zurnalai\\MMMM-MM-DD.txt (vienas failas per dieną), senesni nei 7 d. ištrinami automatiškai. Nustatymuose – „Ištrinti žurnalus“.",
-        "Serverio output'as rašomas tik patikrų metu ir kelias sekundes po scripto komandų – kitų žaidėjų chatas nesirenka.",
-        "Pagal nutylėjimą išjungtas; jei buvo įjungtas, atnaujinus išjungiamas (įjungti galima Nustatymuose).",
+    { versija = "2.14.0", pavadinimas = "Backend changes", pakeitimai = {
+        "Backend changes.",
     } },
     { versija = "2.13.1", pakeitimai = {
         "Atnaujinimų apsauga: parsiųstas scriptas įdiegiamas tik tada, kai jo versija sutampa su version.json (kitaip atnaujinimas atšaukiamas).",

@@ -4,11 +4,8 @@ Autorius: Dex. Naujausia versija viršuje.
 
 Versijos: 1 – dialogų versija, 2 – mimgui. 2.x.x: vidurinis skaičius keičiasi su didesniais pakeitimais, paskutinis – su smulkiais.
 
-## 2.14.0 – Naujas derinimo žurnalas
-- Derinimo žurnalas veikia visoms patikroms, ne tik /visidarbuotojai: scripto komandos, serverio atsakymai (chatas ir langai), statuso pranešimai, patikrų pradžia ir pabaiga.
-- Rašoma į moonloader\config\dpkt\zurnalai\MMMM-MM-DD.txt (vienas failas per dieną), senesni nei 7 d. ištrinami automatiškai. Nustatymuose – „Ištrinti žurnalus“.
-- Serverio output'as rašomas tik patikrų metu ir kelias sekundes po scripto komandų – kitų žaidėjų chatas nesirenka.
-- Pagal nutylėjimą išjungtas; jei buvo įjungtas, atnaujinus išjungiamas (įjungti galima Nustatymuose).
+## 2.14.0 – Backend changes
+- Backend changes.
 
 ## 2.13.1
 - Atnaujinimų apsauga: parsiųstas scriptas įdiegiamas tik tada, kai jo versija sutampa su version.json (kitaip atnaujinimas atšaukiamas).
