@@ -4,6 +4,14 @@ Autorius: Dex. Naujausia versija viršuje.
 
 Versijos: 1 – dialogų versija, 2 – mimgui. 2.x.x: vidurinis skaičius keičiasi su didesniais pakeitimais, paskutinis – su smulkiais.
 
+## 2.16.0 – Juodieji sąrašai
+- Blist skiltyje – sarg.lt juodieji sąrašai (Mafijos/gaujos, Teisėsaugos, Direktorių, Darbų su pakvietimais): nickas, priežastis, nuo, iki, terminas, kas įtraukė. Pirmą kartą atidarius parsiunčiama iš sarg.lt automatiškai, paskui – mygtuku „Atnaujinti iš sarg.lt“. Sąrašas išsaugomas ir lieka perkrovus scriptą.
+- Prisijungę ir sąraše esantys žaidėjai rodomi raudonai (su žaliu tašku), antraštėje – kiek tokių yra.
+- Paieška pagal nicką ar priežastį, varnelė „Tik prisijungę“. Paspaudus nicką – „Kopijuoti nicką“.
+- Prie formos parašoma, jei įvestas žaidėjas jau yra juodajame sąraše (raudonai – jei tame pačiame tipe).
+- Jei sarg.lt nepasiekiamas – „Įkelti iš failo“: puslapis išsaugomas naršyklėje (Ctrl+S) kaip moonloader\config\dpkt\juodieji.html.
+- „Žaidėjo profilis“ pašalintas (kartu ir jo mygtukai Direktoriuose bei nicko meniu).
+
 ## 2.15.3
 - Nustatymuose mygtukas „Atsisiųsti iš naujo“: parsiunčia GitHub'e esantį scriptą net jei versija ta pati (pvz. kai failas buvo įkeltas rankiniu būdu).
 
