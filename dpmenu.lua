@@ -1,6 +1,6 @@
 script_name("DPKT meniu")
 script_author("Dex")
-script_version("2.15.1")
+script_version("2.15.2")
 
 require "lib.moonloader"
 local sampev = require "lib.samp.events"
@@ -160,6 +160,7 @@ local FAILAI = {
     darbuotojai = DUOMENU_APLANKAS .. "\\darbuotojai.json",
     fondai      = DUOMENU_APLANKAS .. "\\fondai.json",
     aktyvumas   = DUOMENU_APLANKAS .. "\\aktyvumas.json",
+    suvestine   = DUOMENU_APLANKAS .. "\\suvestine.json",    -- paskutinė direktorių savaitės suvestinė
     nustatymai  = DUOMENU_APLANKAS .. "\\nustatymai.json",
     atnaujinta  = DUOMENU_APLANKAS .. "\\atnaujinta.txt",   -- po atnaujinimo: iš kurios versijos
 }
@@ -2076,19 +2077,25 @@ local function savaitesTekstas(min)
 end
 
 -- Direktorių savaitės suvestinė: /direkt, tada kiekvienam direktoriui ir pavaduotojui /info už
--- kiekvieną iš paskutinių 7 dienų (įskaitant šiandien). Riba - 7 val. per tas 7 dienas (mažiau - raudonai).
-local direktoriuSuvestine = { langas = nil, RIBA = 420, DIENU = 7 }   -- 420 min = 7 val.
+-- kiekvieną pasirinkto laikotarpio dieną (numatyta: nuo prieš 7 d. iki šiandien). Riba - 7 val. per laikotarpį.
+local direktoriuSuvestine = { langas = nil, RIBA = 420, DIENU = 7, MAX_DIENU = 31,   -- 420 min = 7 val.
+    pasirinkimas = { nuo = new.char[16](), iki = new.char[16](), klaida = nil, atidaryti = false } }
 
-function direktoriuSuvestine.datos()
+-- be argumentų: paskutinės 7 dienos (su šiandiena); su nuo/iki (os.time) - visos dienos tarp jų
+function direktoriuSuvestine.datos(nuo, iki)
     local datos = {}
+    if nuo and iki then
+        for i = 0, math.floor((iki - nuo) / 86400 + 0.5) do datos[#datos + 1] = os.date(DATOS_FORMATAS, nuo + i * 86400) end
+        return datos
+    end
     for i = direktoriuSuvestine.DIENU - 1, 0, -1 do datos[#datos + 1] = os.date(DATOS_FORMATAS, os.time() - i * 86400) end
     return datos
 end
 
--- x.dienos[i] = minutės arba nil (negautas atsakymas) -> suma ir kiek dienų neatsakė
+-- x.dienos[i] = minutės arba nil (negautas atsakymas) -> suma ir kiek dienų neatsakė; x.dienuSk - kiek dienų laikotarpyje
 function direktoriuSuvestine.suma(x)
     local suma, neatsake = 0, 0
-    for i = 1, direktoriuSuvestine.DIENU do
+    for i = 1, x.dienuSk or direktoriuSuvestine.DIENU do
         if x.dienos and x.dienos[i] then suma = suma + x.dienos[i] else neatsake = neatsake + 1 end
     end
     return suma, neatsake
@@ -2116,8 +2123,10 @@ function direktoriuSuvestine.atsitiktine()
                                    atsitiktiniai = true, atidarytas = new.bool(true), fokusas = true }
 end
 
-function direktoriuSuvestine.tikrinti()
+-- datos: dienų sąrašas (iš datos(nuo, iki)); nil - paskutinės 7 dienos
+function direktoriuSuvestine.tikrinti(datos)
     if uzimtas then klaida("Palauk, kol baigsis ankstesnis veiksmas.") return end
+    datos = datos or direktoriuSuvestine.datos()
     uzimtas = true
     pradetiEiga("Direktorių savaitės suvestinė", 1, true)
     prieiga.klaida = nil
@@ -2138,7 +2147,7 @@ function direktoriuSuvestine.tikrinti()
             if e.pavaduotojas then irasai[#irasai + 1] = { darbas = e.pavadinimas, id = e.id, nickas = e.pavaduotojas,
                 pareigos = "Pavaduotojas", online = e.pavaduotojasOnline, dienos = {} } end
         end
-        local datos = direktoriuSuvestine.datos()
+        for _, x in ipairs(irasai) do x.dienuSk = #datos end
         local kiek = #irasai * #datos
         local sekundziu = math.ceil(kiek * (math.max(PAUZE / 1000, 0.3) + 0.1))
         eiga.viso = kiek
@@ -2168,11 +2177,61 @@ function direktoriuSuvestine.tikrinti()
         end
         direktoriuSuvestine.langas = { irasai = irasai, datos = datos, gauta = os.date("%Y-%m-%d %H:%M"),
                                        atidarytas = new.bool(true), fokusas = true }
-        pranesimas(string.format("Suvestinė baigta: %d žmonių, per 7 d. mažiau nei %d val. - %d.", #irasai,
-            direktoriuSuvestine.RIBA / 60, maza))
+        direktoriuSuvestine.issaugoti(direktoriuSuvestine.langas)
+        pranesimas(string.format("Suvestinė baigta: %d žmonių, per %d d. mažiau nei %d val. - %d.", #irasai,
+            #datos, direktoriuSuvestine.RIBA / 60, maza))
         uzimtas = false
         baigtiEiga()
     end)
+end
+
+-- Paskutinė tikra suvestinė išsaugoma faile, kad būtų galima atidaryti iš naujo nepaleidus patikros.
+-- dienos[i] = nil (neatsakė) faile rašoma kaip false, nes JSON masyve tarpų nebūna.
+function direktoriuSuvestine.issaugoti(L)
+    local irasai = {}
+    for _, x in ipairs(L.irasai) do
+        local dienos = {}
+        for i = 1, #L.datos do dienos[i] = x.dienos[i] or false end
+        irasai[#irasai + 1] = { darbas = x.darbas, id = x.id, pareigos = x.pareigos, nickas = x.nickas,
+            online = x.online or false, nezaidzia = x.nezaidzia or false, dienos = dienos }
+    end
+    rasytiJson(FAILAI.suvestine, { irasai = irasai, datos = L.datos, gauta = L.gauta })
+end
+
+function direktoriuSuvestine.ikelti()
+    local d = skaitytiJson(FAILAI.suvestine)
+    if not (d and type(d.irasai) == "table" and type(d.datos) == "table" and #d.datos > 0) then return nil end
+    local irasai = {}
+    for _, x in ipairs(d.irasai) do
+        if type(x) == "table" and x.nickas then
+            local dienos = {}
+            for i = 1, #d.datos do
+                local m = type(x.dienos) == "table" and x.dienos[i]
+                dienos[i] = type(m) == "number" and m or nil
+            end
+            irasai[#irasai + 1] = { darbas = x.darbas or "?", id = x.id, pareigos = x.pareigos or "?", nickas = x.nickas,
+                online = x.online == true, nezaidzia = x.nezaidzia == true or nil, dienos = dienos, dienuSk = #d.datos }
+        end
+    end
+    return { irasai = irasai, datos = d.datos, gauta = d.gauta }
+end
+
+-- "Paskutinė savaitės suvestinė": atidaro paskutinę tikrą suvestinę (atmintyje arba iš failo)
+function direktoriuSuvestine.paskutine()
+    local L = direktoriuSuvestine.langas
+    if not L or L.atsitiktiniai then
+        local f = direktoriuSuvestine.ikelti()
+        if f then
+            L = f
+        elseif not L then
+            klaida("Dar nėra išsaugotos savaitės suvestinės. Paleisk „Savaitės suvestinė“.")
+            return
+        end
+    end
+    L.atidarytas = L.atidarytas or new.bool(true)
+    L.atidarytas[0] = true
+    L.fokusas = true
+    direktoriuSuvestine.langas = L
 end
 
 -- Žaidėjo profilis: /info, įspėjimai (per jo darbo direktorių) ir ar yra tarp paskutinių /bans
@@ -3007,6 +3066,11 @@ end
 -- Po kiekvieno atnaujinimo čia pridedamas naujas įrašas (ir pakeičiamas script_version).
 -- Versijų istorija (naujausia viršuje). Rodoma skiltyje „Pakeitimai“.
 local PAKEITIMAI = {
+    { versija = "2.15.2", pakeitimai = {
+        "Direktoriuose mygtukas „Paskutinė savaitės suvestinė“: atidaro paskutinę padarytą suvestinę nepaleidžiant patikros iš naujo. Suvestinė išsaugoma faile, tad lieka ir perkrovus scriptą ar žaidimą.",
+        "Paspaudus „Savaitės suvestinė“ pirma atsidaro langas su datomis: iš anksto įrašyta nuo prieš 7 d. iki šiandien, galima pasirinkti bet kokį laikotarpį (daugiausia 31 d.). Raudonai – mažiau nei 7 val. per pasirinktą laikotarpį.",
+        "Suvestinėje direktoriai ir pavaduotojai rodomi atskirai: dvi dalys su antraštėmis (kiek žmonių ir kiek žaidė mažiau nei 7 val.), rūšiavimas veikia kiekvienos dalies viduje. Kopijuojant – ta pati tvarka.",
+    } },
     { versija = "2.15.1", pakeitimai = {
         "Backend changes.",
     } },
@@ -3448,6 +3512,58 @@ function profilis.atidaryti(nickas, dev)
     if dev then profilis.atsitiktinis(nickas) else profilis.tikrinti(nickas) end
 end
 
+-- "Savaitės suvestinė": pirma langas su datomis (numatyta nuo prieš 7 d. iki šiandien)
+function direktoriuSuvestine.pasirinktiDatas()
+    local D = direktoriuSuvestine.pasirinkimas
+    irasyti(D.nuo, os.date(DATOS_FORMATAS, os.time() - 7 * 86400))
+    irasyti(D.iki, os.date(DATOS_FORMATAS))
+    D.klaida, D.atidaryti = nil, true
+end
+
+-- piešiama Direktorių skiltyje
+function direktoriuSuvestine.datuLangas()
+    local SV, D = direktoriuSuvestine, direktoriuSuvestine.pasirinkimas
+    if D.atidaryti then
+        imgui.OpenPopup("Direktorių suvestinė##sv_datos")
+        D.atidaryti = false
+    end
+    if imgui.BeginPopupModal("Direktorių suvestinė##sv_datos", nil, imgui.WindowFlags.AlwaysAutoResize) then
+        TPilkas("Kiekvieno direktoriaus ir pavaduotojo /info už kiekvieną laikotarpio dieną.")
+        imgui.PushItemWidth(160)
+        T("Nuo") imgui.SameLine(70)
+        imgui.InputText("##sv_nuo", D.nuo, ffi.sizeof(D.nuo))
+        T("Iki") imgui.SameLine(70)
+        imgui.InputText("##sv_iki", D.iki, ffi.sizeof(D.iki))
+        imgui.PopItemWidth()
+        local nuo, iki = datosLaikas(skaityti(D.nuo)), datosLaikas(skaityti(D.iki))
+        if nuo and iki and iki >= nuo then
+            TPilkas(string.format("%d d.", math.floor((iki - nuo) / 86400 + 0.5) + 1))
+        end
+        if D.klaida then T(D.klaida, SPALVA_RAUDONA) end
+        imgui.Spacing()
+        if spalvotasMygtukas("Pradėti", MYGTUKAS_ZALIAS, imgui.ImVec2(120, 0)) then
+            if not nuo then
+                D.klaida = "Netinkama pradžios data. Formatas MMMM-MM-DD."
+            elseif not iki then
+                D.klaida = "Netinkama pabaigos data. Formatas MMMM-MM-DD."
+            elseif nuo > os.time() then
+                D.klaida = "Pradžios data negali būti ateityje."
+            elseif iki < nuo then
+                D.klaida = "Pabaigos data negali būti ankstesnė už pradžios."
+            elseif (iki - nuo) / 86400 + 1 > SV.MAX_DIENU then
+                D.klaida = string.format("Daugiausia %d dienų vienu kartu.", SV.MAX_DIENU)
+            else
+                D.klaida = nil
+                imgui.CloseCurrentPopup()
+                SV.tikrinti(SV.datos(nuo, iki))
+            end
+        end
+        imgui.SameLine()
+        if imgui.Button("Atšaukti", imgui.ImVec2(120, 0)) then imgui.CloseCurrentPopup() end
+        imgui.EndPopup()
+    end
+end
+
 -- "Aktyvumas (7d.)": paskutinės 7 dienos (su šiandiena), patikra prasideda iškart
 function direktoriuSuvestine.aktyvumas7d(nickas, dev)
     if not nickas then return end
@@ -3468,12 +3584,18 @@ local function rodytiDirektorius()
     imgui.SameLine()
     if imgui.SmallButton("Atnaujinti (/direkt)") then siusti("/direkt") end
     imgui.SameLine()
-    if imgui.SmallButton("Savaitės suvestinė") then direktoriuSuvestine.tikrinti() end
+    if imgui.SmallButton("Savaitės suvestinė") then direktoriuSuvestine.pasirinktiDatas() end
     if imgui.IsItemHovered() then
-        imgui.SetTooltip("Visų direktorių ir pavaduotojų žaidimo laikas kiekvieną iš paskutinių 7 dienų (/info)")
+        imgui.SetTooltip("Visų direktorių ir pavaduotojų žaidimo laikas kiekvieną pasirinkto laikotarpio dieną (/info)")
     end
     imgui.SameLine(0, 4)
     T("(WIP)", SPALVA_GELTONA)
+    imgui.SameLine()
+    if imgui.SmallButton("Paskutinė savaitės suvestinė") then direktoriuSuvestine.paskutine() end
+    if imgui.IsItemHovered() then
+        imgui.SetTooltip("Atidaro paskutinę padarytą suvestinę, patikra iš naujo nepaleidžiama")
+    end
+    direktoriuSuvestine.datuLangas()
     if nust.dev then
         imgui.SameLine()
         if imgui.SmallButton("Suvestinė (Dev)") then direktoriuSuvestine.atsitiktine() end
@@ -4361,10 +4483,12 @@ local function rodytiNustatymus()
         if imgui.Button("Sugeneruoti naujus atsitiktinius duomenis") then atsitiktiniai = {} end
     end
     if spalvotasMygtukas("Ištrinti surinktus duomenis", MYGTUKAS_RAUDONAS) then
-        paklausti("Ar tikrai nori ištrinti visus surinktus duomenis (darbuotojai, fondai, aktyvumas)?", function()
+        paklausti("Ar tikrai nori ištrinti visus surinktus duomenis (darbuotojai, fondai, aktyvumas, savaitės suvestinė)?", function()
             os.remove(FAILAI.darbuotojai)
             os.remove(FAILAI.fondai)
             os.remove(FAILAI.aktyvumas)
+            os.remove(FAILAI.suvestine)
+            direktoriuSuvestine.langas = nil
             duomenys.darbuotojai, duomenys.fondai, duomenys.aktyvumas = nil, nil, nil
             duomenys.direkt, duomenys.sutapimas = nil, nil
             pranesimas("Surinkti duomenys ištrinti.")
@@ -5485,8 +5609,10 @@ imgui.OnFrame(function() return direktoriuSuvestine.langas ~= nil and direktoriu
         if SV.suma(x) < SV.RIBA then maza = maza + 1 end
         if x.online then online = online + 1 end
     end
-    T(string.format("Žmonių: %d   Prisijungę: %d   Per 7 d. mažiau nei %d val.: %d", #L.irasai, online, SV.RIBA / 60, maza))
-    TPilkas(string.format("Gauta: %s   Laikotarpis: %s - %s   Raudonai - mažiau nei " .. math.floor(SV.RIBA / 60) .. " val. per 7 dienas.",
+    T(string.format("Žmonių: %d   Prisijungę: %d   Per %d d. mažiau nei %d val.: %d", #L.irasai, online, #L.datos,
+        SV.RIBA / 60, maza))
+    TPilkas(string.format("Gauta: %s   Laikotarpis: %s - %s   Raudonai - mažiau nei " .. math.floor(SV.RIBA / 60)
+        .. " val. per laikotarpį.",
         tekst(L.gauta), tekst(L.datos[1]), tekst(L.datos[#L.datos])))
     if L.atsitiktiniai then T("Dev režimas: rodomi atsitiktiniai duomenys.", SPALVA_GELTONA) end
     L.rusiuotiUI = L.rusiuotiUI or new.bool(false)
@@ -5497,7 +5623,10 @@ imgui.OnFrame(function() return direktoriuSuvestine.langas ~= nil and direktoriu
         for _, data in ipairs(L.datos) do antr[#antr + 1] = data:sub(6) end
         antr[#antr + 1] = "Iš viso"
         local eil = { table.concat(antr, " | ") }
-        for _, x in ipairs(L.irasai) do
+        local kopijuoti = {}
+        for _, x in ipairs(L.irasai) do if x.pareigos == "Direktorius" then kopijuoti[#kopijuoti + 1] = x end end
+        for _, x in ipairs(L.irasai) do if x.pareigos ~= "Direktorius" then kopijuoti[#kopijuoti + 1] = x end end
+        for _, x in ipairs(kopijuoti) do
             local l = { x.darbas, x.pareigos, x.nickas }
             for i = 1, #L.datos do l[#l + 1] = x.nezaidzia and "-" or (x.dienos[i] and (x.dienos[i] .. " min") or "?") end
             l[#l + 1] = x.nezaidzia and "Nežaidžia" or savaitesTekstas((SV.suma(x)))
@@ -5517,7 +5646,10 @@ imgui.OnFrame(function() return direktoriuSuvestine.langas ~= nil and direktoriu
         table.sort(tvarka, function(a, b) return SV.suma(a) < SV.suma(b) end)
     end
     local stulpeliu = 3 + #L.datos + 1
-    imgui.BeginChild("##sv_lentele", imgui.ImVec2(0, 0), false)
+    -- ilgam laikotarpiui lentelė platesnė už langą: horizontali slinktis
+    local turinioPlotis = 230 + 110 + 190 + 62 * #L.datos + 170
+    if imgui.SetNextWindowContentSize then imgui.SetNextWindowContentSize(imgui.ImVec2(turinioPlotis, 0)) end
+    imgui.BeginChild("##sv_lentele", imgui.ImVec2(0, 0), false, imgui.WindowFlags.HorizontalScrollbar)
     lentelesStulpeliai(stulpeliu, "##sv_st" .. stulpeliu, true)
     imgui.SetColumnWidth(0, 230)
     imgui.SetColumnWidth(1, 110)
@@ -5527,7 +5659,31 @@ imgui.OnFrame(function() return direktoriuSuvestine.langas ~= nil and direktoriu
     for _, data in ipairs(L.datos) do TPilkas(data:sub(6)) imgui.NextColumn() end
     TPilkas("Iš viso") imgui.NextColumn()
     imgui.Separator()
-    for n, x in ipairs(tvarka) do
+    -- atskirai: pirma direktoriai, po to pavaduotojai (tvarka grupės viduje išlieka)
+    local grupes = { { pavadinimas = "Direktoriai", spalva = SPALVA_GELTONA, irasai = {} },
+                     { pavadinimas = "Pavaduotojai", irasai = {} } }
+    for _, x in ipairs(tvarka) do
+        local g = x.pareigos == "Direktorius" and grupes[1] or grupes[2]
+        g.irasai[#g.irasai + 1] = x
+    end
+    local n = 0
+    for gi, g in ipairs(grupes) do
+      if #g.irasai > 0 then
+        if gi > 1 then
+            -- tuščia eilutė tarp grupių
+            for _ = 1, stulpeliu do imgui.NextColumn() end
+            imgui.Separator()
+        end
+        local maz = 0
+        for _, x in ipairs(g.irasai) do if SV.suma(x) < SV.RIBA then maz = maz + 1 end end
+        T(string.format("%s (%d)", g.pavadinimas, #g.irasai), g.spalva or SPALVA_ZALIA) imgui.NextColumn()
+        for _ = 2, stulpeliu - 1 do imgui.NextColumn() end
+        -- "Iš viso" stulpelyje: kiek šios grupės žaidė mažiau nei riba (ten užtenka vietos)
+        if maz > 0 then T(string.format("< %d val.: %d", SV.RIBA / 60, maz), SPALVA_RAUDONA) end
+        imgui.NextColumn()
+        imgui.Separator()
+      for _, x in ipairs(g.irasai) do
+        n = n + 1
         local suma, neatsake = SV.suma(x)
         T(x.darbas) imgui.NextColumn()
         T(x.pareigos, x.pareigos == "Direktorius" and SPALVA_GELTONA or nil) imgui.NextColumn()
@@ -5552,6 +5708,8 @@ imgui.OnFrame(function() return direktoriuSuvestine.langas ~= nil and direktoriu
                 suma < SV.RIBA and SPALVA_RAUDONA or SPALVA_ZALIA)
         end
         imgui.NextColumn()
+      end
+      end
     end
     stulpeliuPabaiga()
     imgui.EndChild()
