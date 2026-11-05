@@ -1,6 +1,6 @@
 script_name("DPKT meniu")
 script_author("Dex")
-script_version("2.15.2")
+script_version("2.15.3")
 
 require "lib.moonloader"
 local sampev = require "lib.samp.events"
@@ -2378,7 +2378,8 @@ function atnaujinimai.adresas()
 end
 
 -- rankiniu = paspaustas mygtukas (tada pranešam ir apie "naujesnės nėra")
-function atnaujinimai.tikrinti(rankiniu)
+-- isNaujo: "Atsisiųsti iš naujo" - parsiunčia GitHub'e esantį failą nepaisant versijos numerio
+function atnaujinimai.tikrinti(rankiniu, isNaujo)
     local A = atnaujinimai
     if A.vyksta then return end
     A.vyksta = true
@@ -2400,7 +2401,7 @@ function atnaujinimai.tikrinti(rankiniu)
             if rankiniu then klaida("Nepavyko perskaityti version.json.") end
             return
         end
-        if not A.naujesne(nauja, dabartine) then
+        if not isNaujo and not A.naujesne(nauja, dabartine) then
             A.busena, A.vyksta = "Naudoji naujausią versiją (v" .. dabartine .. ").", false
             if rankiniu then pranesimas("Atnaujinimų nėra, naudoji naujausią versiją (v" .. dabartine .. ").") end
             return
@@ -2408,7 +2409,7 @@ function atnaujinimai.tikrinti(rankiniu)
 
         -- nelaukiam patikros vidury: palaukiam, kol baigsis
         while uzimtas do wait(500) end
-        pranesimas("Rasta nauja versija v" .. nauja .. ", siunčiama...")
+        pranesimas(isNaujo and ("Atsisiunčiama iš naujo v" .. nauja .. "...") or ("Rasta nauja versija v" .. nauja .. ", siunčiama..."))
         A.busena = "Siunčiama v" .. nauja .. "..."
         local kelias = thisScript().path
         local tmp = kelias .. ".naujas"
@@ -2446,7 +2447,7 @@ function atnaujinimai.tikrinti(rankiniu)
         end
         local f = io.open(FAILAI.atnaujinta, "w")
         if f then f:write(dabartine) f:close() end
-        pranesimas("Atnaujinta į v" .. nauja .. ", perkraunama...")
+        pranesimas((isNaujo and "Atsisiųsta iš naujo v" or "Atnaujinta į v") .. nauja .. ", perkraunama...")
         wait(500)
         thisScript():reload()
     end)
@@ -3066,6 +3067,9 @@ end
 -- Po kiekvieno atnaujinimo čia pridedamas naujas įrašas (ir pakeičiamas script_version).
 -- Versijų istorija (naujausia viršuje). Rodoma skiltyje „Pakeitimai“.
 local PAKEITIMAI = {
+    { versija = "2.15.3", pakeitimai = {
+        "Nustatymuose mygtukas „Atsisiųsti iš naujo“: parsiunčia GitHub'e esantį scriptą net jei versija ta pati (pvz. kai failas buvo įkeltas rankiniu būdu).",
+    } },
     { versija = "2.15.2", pakeitimai = {
         "Direktoriuose mygtukas „Paskutinė savaitės suvestinė“: atidaro paskutinę padarytą suvestinę nepaleidžiant patikros iš naujo. Suvestinė išsaugoma faile, tad lieka ir perkrovus scriptą ar žaidimą.",
         "Paspaudus „Savaitės suvestinė“ pirma atsidaro langas su datomis: iš anksto įrašyta nuo prieš 7 d. iki šiandien, galima pasirinkti bet kokį laikotarpį (daugiausia 31 d.). Raudonai – mažiau nei 7 val. per pasirinktą laikotarpį.",
@@ -4513,6 +4517,14 @@ local function rodytiNustatymus()
     zymimasis("autoAtnaujinimai", "Automatiniai atnaujinimai", "įkėlus scriptą tikrina GitHub ir atsinaujina")
     if imgui.Button("Tikrinti atnaujinimus dabar") then atnaujinimai.tikrinti(true) end
     imgui.SameLine()
+    if imgui.Button("Atsisiųsti iš naujo") then
+        paklausti("Atsisiųsti DPKT meniu iš naujo iš GitHub?\nFailas bus pakeistas net jei versija ta pati, scriptas persikraus.",
+            function() atnaujinimai.tikrinti(true, true) end)
+    end
+    if imgui.IsItemHovered() then
+        imgui.SetTooltip("Kai pas tave tokia pati versija, bet kitas failas (pvz. įkeltas rankiniu būdu)")
+    end
+    imgui.SameLine()
     TPilkas("v" .. tostring(thisScript().version) .. (atnaujinimai.busena and ("   " .. atnaujinimai.busena) or ""))
 
     skyrius("Išvaizda")
@@ -5896,8 +5908,10 @@ function main()
         local buvo = f and f:read("*a") or "?"
         if f then f:close() end
         os.remove(FAILAI.atnaujinta)
-        local tekstas = string.format("Atnaujinta iš v%s į v%s. Kas nauja - skiltyje Pakeitimai.",
-            apkarpyti(buvo), tostring(thisScript().version))
+        local dabar = tostring(thisScript().version)
+        local tekstas = apkarpyti(buvo) == dabar
+            and string.format("Atsisiųsta iš naujo v%s.", dabar)
+            or string.format("Atnaujinta iš v%s į v%s. Kas nauja - skiltyje Pakeitimai.", apkarpyti(buvo), dabar)
         sampAddChatMessage(saugusLtu("* DPKT meniu - " .. tekstas), ZALIA)
         pranesimas(tekstas)
     end
