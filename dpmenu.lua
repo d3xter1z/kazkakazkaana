@@ -3070,6 +3070,7 @@ local PAKEITIMAI = {
         "Direktoriuose mygtukas „Paskutinė savaitės suvestinė“: atidaro paskutinę padarytą suvestinę nepaleidžiant patikros iš naujo. Suvestinė išsaugoma faile, tad lieka ir perkrovus scriptą ar žaidimą.",
         "Paspaudus „Savaitės suvestinė“ pirma atsidaro langas su datomis: iš anksto įrašyta nuo prieš 7 d. iki šiandien, galima pasirinkti bet kokį laikotarpį (daugiausia 31 d.). Raudonai – mažiau nei 7 val. per pasirinktą laikotarpį.",
         "Suvestinėje direktoriai ir pavaduotojai rodomi atskirai: dvi dalys su antraštėmis (kiek žmonių ir kiek žaidė mažiau nei 7 val.), rūšiavimas veikia kiekvienos dalies viduje. Kopijuojant – ta pati tvarka.",
+        "„Savaitės suvestinė“ nebe (WIP).",
     } },
     { versija = "2.15.1", pakeitimai = {
         "Backend changes.",
@@ -3588,8 +3589,6 @@ local function rodytiDirektorius()
     if imgui.IsItemHovered() then
         imgui.SetTooltip("Visų direktorių ir pavaduotojų žaidimo laikas kiekvieną pasirinkto laikotarpio dieną (/info)")
     end
-    imgui.SameLine(0, 4)
-    T("(WIP)", SPALVA_GELTONA)
     imgui.SameLine()
     if imgui.SmallButton("Paskutinė savaitės suvestinė") then direktoriuSuvestine.paskutine() end
     if imgui.IsItemHovered() then

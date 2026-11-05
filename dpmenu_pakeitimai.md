@@ -8,6 +8,7 @@ Versijos: 1 – dialogų versija, 2 – mimgui. 2.x.x: vidurinis skaičius keič
 - Direktoriuose mygtukas „Paskutinė savaitės suvestinė“: atidaro paskutinę padarytą suvestinę nepaleidžiant patikros iš naujo. Suvestinė išsaugoma faile, tad lieka ir perkrovus scriptą ar žaidimą.
 - Paspaudus „Savaitės suvestinė“ pirma atsidaro langas su datomis: iš anksto įrašyta nuo prieš 7 d. iki šiandien, galima pasirinkti bet kokį laikotarpį (daugiausia 31 d.). Raudonai – mažiau nei 7 val. per pasirinktą laikotarpį.
 - Suvestinėje direktoriai ir pavaduotojai rodomi atskirai: dvi dalys su antraštėmis (kiek žmonių ir kiek žaidė mažiau nei 7 val.), rūšiavimas veikia kiekvienos dalies viduje. Kopijuojant – ta pati tvarka.
+- „Savaitės suvestinė“ nebe (WIP).
 
 ## 2.15.1
 - Backend changes.
