@@ -1,6 +1,6 @@
 script_name("DPKT meniu")
 script_author("Dex")
-script_version("2.17.0")
+script_version("2.17.1")
 
 require "lib.moonloader"
 local sampev = require "lib.samp.events"
@@ -173,6 +173,7 @@ local NUMATYTI_NUSTATYMAI = {
     dev = false,                 -- Dev režimas: atsitiktiniai duomenys, kol nėra tikrų
     sriftas = 17,                -- šrifto dydis (taikoma perkrovus scriptą)
     langoAlfa = 1.0,             -- lango nepermatomumas (1 = visiškai nepermatomas)
+    tema = 2,                    -- 1 klasikinė, 2 mėlyna, 3 smaragdinė
     vaivorykste = false,         -- vaivorykštinė pavadinimo juosta (išjungus - juoda)
     animacija = true,            -- ar vaivorykštė juda
     vaivorykstesGreitis = 0.08,  -- kaip greitai juda
@@ -186,7 +187,7 @@ local NUMATYTI_NUSTATYMAI = {
     chate = false,               -- pranešimus rodyti ir chate (ne tik skiltyje "Statusas")
     pasveikinimas = true,        -- "DPKT meniu įkeltas" žinutė
     zurnalas = false,            -- derinimo žurnalas (config\dpkt\zurnalai), pagal nutylėjimą išjungtas
-    nustVersija = 3,             -- nustatymų failo versija (senų nustatymų perkėlimui)
+    nustVersija = 4,             -- nustatymų failo versija (senų nustatymų perkėlimui)
     autoAtnaujinimai = true,     -- įkėlus scriptą tikrinti GitHub ir atsinaujinti
 }
 local nust = {}
@@ -216,6 +217,12 @@ local function ikeltiNustatymus()
             -- 3 versija: serverio atsakymo laukiama 0,5 s (buvo 2 s)
             if (tonumber(d.nustVersija) or 1) < 3 then
                 nust.laukti = NUMATYTI_NUSTATYMAI.laukti
+                nust.nustVersija = NUMATYTI_NUSTATYMAI.nustVersija
+                nustatymaiPakeisti = true
+            end
+            -- 4 versija: numatytoji tema - Mėlyna (testuojant galėjo likti išsaugota kita)
+            if (tonumber(d.nustVersija) or 1) < 4 then
+                nust.tema = NUMATYTI_NUSTATYMAI.tema
                 nust.nustVersija = NUMATYTI_NUSTATYMAI.nustVersija
                 nustatymaiPakeisti = true
             end
@@ -2996,6 +3003,8 @@ local function paklausti(klausimas, veiksmas)
 end
 
 ---------------------------------------------------------------- UI: PAGALBINĖS
+local titulinisSriftas = nil   -- storas, didesnis šriftas pavadinimo juostai ir skilčių antraštėms
+local SPALVA_AKCENTAS = imgui.ImVec4(0.33, 0.62, 0.98, 1.00)   -- pažymėjimai, skyrių antraštės, varnelės
 local SPALVA_ZALIA   = imgui.ImVec4(0.30, 0.85, 0.30, 1.00)
 local SPALVA_RAUDONA = imgui.ImVec4(1.00, 0.30, 0.30, 1.00)
 local SPALVA_GELTONA = imgui.ImVec4(1.00, 0.82, 0.30, 1.00)
@@ -3014,14 +3023,16 @@ local function duomenuBusena(d)
     end
 end
 
--- tekstas be printf formatavimo (kad "%" nesugadintų)
-local function T(tekstas, spalva)
+-- tekstas be printf formatavimo (kad "%" nesugadintų); antraste = true - storu, didesniu šriftu (skilties pavadinimas)
+local function T(tekstas, spalva, antraste)
     tekstas = tostring(tekstas or "")
+    if antraste and titulinisSriftas then imgui.PushFont(titulinisSriftas) end
     if spalva then
         imgui.TextColored(spalva, (tekstas:gsub("%%", "%%%%")))
     else
         imgui.TextUnformatted(tekstas)
     end
+    if antraste and titulinisSriftas then imgui.PopFont() end
 end
 
 local function TPilkas(tekstas)
@@ -3117,6 +3128,14 @@ end
 -- Po kiekvieno atnaujinimo čia pridedamas naujas įrašas (ir pakeičiamas script_version).
 -- Versijų istorija (naujausia viršuje). Rodoma skiltyje „Pakeitimai“.
 local PAKEITIMAI = {
+    { versija = "2.17.1", pakeitimai = {
+        "Nustatymuose (Išvaizda) – temos: Klasikinė (kaip anksčiau), Mėlyna (pagal nutylėjimą) ir Smaragdinė. Persijungia iškart.",
+        "Smaragdinė: plokščios kortelės be rėmelių, daugiau oro, žaliai mėlynas akcentas. Mėlyna: rėmeliai, apvalesni laukai ir mygtukai, mėlynas akcentas.",
+        "Kairiajame meniu – aukštesni punktai, pažymėtas punktas su akcento spalvos juostele, grupių pavadinimai akcento spalva.",
+        "Skilčių pavadinimai storu šriftu, pavadinimo juostoje šalia – versija, apačioje – akcento spalvos linija.",
+        "Pagrindiniame – /dpversija komandų sąraše.",
+        "Pagrindinis langas nebeslenka horizontaliai laikant Shift ir sukant ratuką.",
+    } },
     { versija = "2.17.0", pavadinimas = "Versijos pasirinkimas", pakeitimai = {
         "Nustatymuose „Versijos pasirinkimas“ (arba komanda /dpversija): galima įdiegti ankstesnę versiją iš GitHub – 27 išlikusios versijos nuo v3.4 iki dabartinės (v3.4–v5.8 – sena numeracija, iki 2.9.0).",
         "Pasirinkta ne naujausia versija prisegama: automatiniai atnaujinimai jos nebekeičia, kol vėl nepasirenkama naujausia. Įkėlus scriptą chate primenama, kad versija prisegta.",
@@ -3346,6 +3365,7 @@ local PAGRINDINIO_KOMANDOS = {
     { "/aktyvumas", "Atidaro aktyvumo patikrą" },
     { "/vdd",       "Atidaro visų darbų darbuotojus" },
     { "/vdf",       "Atidaro visų darbų fondus" },
+    { "/dpversija", "Versijos pasirinkimas: įdiegti ankstesnę versiją iš GitHub" },
     { "/noriudarbo", "Serverio komanda: jei įjungta nustatymuose, be ID atidaro „Pakeisti darbą“" },
     { "/direkt",    "Serverio komanda: jei įjungta nustatymuose, vietoj serverio lentelės atidaro Direktorių skiltį" },
     { "/arsutapo",  "Be paskyrų atidaro Paskyrų sutapimo skiltį. Su dviem paskyromis - serverio komanda, rezultatas rodomas meniu (jei įjungta nustatymuose)" },
@@ -3370,17 +3390,18 @@ local PAGRINDINIO_SKILTYS = {
 }
 
 local function rodytiPagrindini()
-    T("DPKT meniu v" .. thisScript().version)
+    T("DPKT meniu v" .. thisScript().version, nil, true)
     TPilkas("Administravimo įrankiai darbams, direktoriams ir žaidėjų aktyvumui tikrinti.")
     T("Jei turi atsiliepimų/idėjų/problemų, tai pisti protą Chromei :D", SPALVA_GELTONA)
     imgui.Separator()
     imgui.Spacing()
 
-    T("Komandos")
+    T("Komandos", SPALVA_AKCENTAS, true)
+    imgui.Spacing()
     imgui.Columns(2, "##pagr_komandos", false)
     imgui.SetColumnWidth(0, stulpelioPlotis(PAGRINDINIO_KOMANDOS, 100))
     for _, k in ipairs(PAGRINDINIO_KOMANDOS) do
-        T(k[1], SPALVA_ZALIA) imgui.NextColumn()
+        T(k[1], SPALVA_AKCENTAS) imgui.NextColumn()
         T(k[2]) imgui.NextColumn()
     end
     imgui.Columns(1)
@@ -3388,11 +3409,12 @@ local function rodytiPagrindini()
     imgui.Separator()
     imgui.Spacing()
 
-    T("Ką daro scriptas")
+    T("Ką daro scriptas", SPALVA_AKCENTAS, true)
+    imgui.Spacing()
     imgui.Columns(2, "##pagr_skiltys", false)
     imgui.SetColumnWidth(0, stulpelioPlotis(PAGRINDINIO_SKILTYS, 100))
     for _, k in ipairs(PAGRINDINIO_SKILTYS) do
-        T(k[1], SPALVA_ZALIA) imgui.NextColumn()
+        T(k[1], SPALVA_AKCENTAS) imgui.NextColumn()
         imgui.TextWrapped((k[2]:gsub("%%", "%%%%"))) imgui.NextColumn()
     end
     imgui.Columns(1)
@@ -3410,7 +3432,7 @@ local function rodytiPagrindini()
 end
 
 local function rodytiDarbuPatikra()
-    T("Darbų patikra")
+    T("Darbų patikra", nil, true)
     TPilkas("Užsideda tau darbo direktorių, patikrina /dfondas ir /visidarbuotojai, nusiima ir atidaro darbo analizę.")
     imgui.Separator()
     -- data /visidarbuotojai (fondas visada dabartinis)
@@ -3472,7 +3494,7 @@ local function rodytiDarbuPatikra()
 end
 
 local function rodytiDarboKeitima()
-    T("Pakeisti darbą")
+    T("Pakeisti darbą", nil, true)
     TPilkas("Išsiunčia " .. KOMANDOS.darboKeitimas:gsub("%%d", "<ID>"))
     imgui.Separator()
     imgui.Columns(3, "##keisti", false)
@@ -3500,7 +3522,7 @@ function juodieji.rodyti()
         J.ikelti()
         J.atnaujinti()   -- kartą per sesiją automatiškai
     end
-    T("Juodieji sąrašai (sarg.lt)")
+    T("Juodieji sąrašai (sarg.lt)", SPALVA_AKCENTAS)
     imgui.SameLine()
     if imgui.SmallButton(J.vyksta and "Siunčiama...##jsa" or "Atnaujinti iš sarg.lt##jsa") and not J.vyksta then J.atnaujinti() end
     imgui.SameLine()
@@ -3607,7 +3629,7 @@ function juodieji.rodyti()
 end
 
 local function rodytiBlist()
-    T("Blist")
+    T("Blist", nil, true)
     imgui.Separator()
     imgui.Spacing()
 
@@ -3766,7 +3788,7 @@ function direktoriuSuvestine.aktyvumas7d(nickas, dev)
 end
 
 local function rodytiDirektorius()
-    T("Direktoriai")
+    T("Direktoriai", nil, true)
     imgui.SameLine()
     if imgui.SmallButton("Atnaujinti (/direkt)") then siusti("/direkt") end
     imgui.SameLine()
@@ -3935,7 +3957,7 @@ local function darboStulpeliai(eilutes)
 end
 
 local function rodytiDarbuotojus()
-    T("Visų darbų darbuotojai")
+    T("Visų darbų darbuotojai", nil, true)
     imgui.SameLine()
     -- grąžina true ir datą (nil = šiandien) arba false, jei data netinkama
     local function pasirinktaData()
@@ -4078,7 +4100,7 @@ local function rodytiDarbuotojus()
 end
 
 local function rodytiFondus()
-    T("Visų darbų fondai")
+    T("Visų darbų fondai", nil, true)
     imgui.SameLine()
     if spalvotasMygtukas("Atnaujinti informaciją##fondai", MYGTUKAS_ZALIAS) then rinktiFondus() end
     imgui.Separator()
@@ -4172,7 +4194,7 @@ local function rodytiZaidejuSarasa(aukstis, pasirinktas, kaiPasirinkta)
 end
 
 local function rodytiAktyvuma()
-    T("Aktyvumas")
+    T("Aktyvumas", nil, true)
     TPilkas("/info <nickas> <data> kiekvienai dienai. Žaidėją gali pasirinkti iš sąrašo dešinėje.")
     imgui.Separator()
 
@@ -4421,7 +4443,7 @@ local function isvada(eilutes, spalva)
 end
 
 local function rodytiSutapima()
-    T("Paskyrų sutapimas")
+    T("Paskyrų sutapimas", nil, true)
     TPilkas("/arsutapo: ar dvi paskyros jungėsi iš to paties IP arba kompiuterio (SAMP ID).")
     imgui.Separator()
 
@@ -4636,12 +4658,13 @@ end
 
 local function skyrius(pavadinimas)
     imgui.Spacing()
-    T(pavadinimas, SPALVA_ZALIA)
+    imgui.Spacing()
+    T(pavadinimas, SPALVA_AKCENTAS)
     imgui.Separator()
 end
 
 local function rodytiNustatymus()
-    T("Nustatymai")
+    T("Nustatymai", nil, true)
     TPilkas("Pakeitimai išsaugomi automatiškai (config\\dpkt\\nustatymai.json).")
     imgui.Separator()
 
@@ -4710,6 +4733,23 @@ local function rodytiNustatymus()
     end
 
     skyrius("Išvaizda")
+    T("Tema")
+    for i, pav in ipairs({ "Klasikinė", "Mėlyna", "Smaragdinė" }) do
+        imgui.SameLine()
+        local paspausta
+        if nust.tema == i then
+            paspausta = spalvotasMygtukas(pav .. "##tema" .. i, imgui.ImVec4(SPALVA_AKCENTAS.x * 0.55, SPALVA_AKCENTAS.y * 0.55,
+                SPALVA_AKCENTAS.z * 0.55, 1), imgui.ImVec2(110, 0))
+        else
+            paspausta = imgui.Button(pav .. "##tema" .. i, imgui.ImVec2(110, 0))
+        end
+        if paspausta and nust.tema ~= i then
+            nust.tema = i
+            nustatymuRodikliai().tema[0] = i
+            ui.temaPakeista = true
+            pakeista()
+        end
+    end
     slankiklisInt("sriftas", "Šrifto dydis", 12, 24, "%d")
     imgui.SameLine()
     if imgui.SmallButton("Perkrauti scriptą") then
@@ -4749,7 +4789,7 @@ local function trukmesTekstas(sek)
 end
 
 local function rodytiStatusa()
-    T("Statusas")
+    T("Statusas", nil, true)
     TPilkas("Čia rodoma viskas, ką scriptas daro ir ką praneša.")
     imgui.Separator()
 
@@ -4824,7 +4864,6 @@ local TURINYS = {
     nustatymai = rodytiNustatymus,
 }
 
-local titulinisSriftas = nil   -- storas, didesnis šriftas pavadinimo juostai
 
 -- Event grupės skiltys (Mafijų, gaujų / Teisėsaugos / Event fondas): išrašas, nicko meniu
 -- (kopijuoti, duoti pinigų). Atidarius skiltį fondas užklausiamas automatiškai.
@@ -4836,7 +4875,7 @@ function eventFondai.rodyti(id)
     end
     local f = E.pagalId(id)
     local d = E.duomenys[f.id]
-    T(f.pavadinimas .. " fondas")
+    T(f.pavadinimas .. " fondas", nil, true)
     TPilkas(f.komanda .. ". Paspaudus nicką: kopijuoti nicką arba duoti pinigų iš fondo (" .. f.duoti:match("^(/%S+)") .. ").")
     imgui.Separator()
 
@@ -4918,7 +4957,7 @@ TURINYS.uzblokavimai = function()
         U.matomas = true
         U.atnaujinti()
     end
-    T("Užblokavimai")
+    T("Užblokavimai", nil, true)
     TPilkas(KOMANDOS.banai .. " - paskutiniai ban. Paspaudus užblokuotą: kopijuoti nicką arba atblokuoti, adminą - kopijuoti nicką.")
     imgui.Separator()
     if imgui.SmallButton("Atnaujinti##ub_atn") then U.atnaujinti() end
@@ -5082,7 +5121,7 @@ end
 
 -- skiltis "Pakeitimai": didesni atnaujinimai (2.X.0) ryškiai, smulkūs (2.x.X) pilkai
 TURINYS.pakeitimai = function()
-    T("Pakeitimai")
+    T("Pakeitimai", nil, true)
     TPilkas("Dabartinė versija: v" .. tostring(thisScript().version) .. ". Naujausi pakeitimai viršuje.")
     imgui.Separator()
     imgui.BeginChild("##pakeitimai", imgui.ImVec2(0, 0), false)
@@ -5108,48 +5147,88 @@ end
 local LT_SIMBOLIAI = ffi.new("ImWchar[9]", 0x0020, 0x00FF, 0x0100, 0x017F, 0x2010, 0x205E, 0x20AC, 0x20AC, 0)
 
 ---------------------------------------------------------------- UI: JUODA TEMA + VAIVORYKŠTĖ
+-- Temos (Nustatymai -> Išvaizda): 1 - klasikinė (pilka, kampuota), 2 - mėlyna (numatytoji; rėmeliai, mėlynas akcentas),
+-- 3 - smaragdinė (plokščios kortelės be rėmelių, žaliai mėlynas akcentas). SPALVA_AKCENTAS keičiama vietoje.
 local function juodaTema()
     local st = imgui.GetStyle()
     local c, k = st.Colors, imgui.Col
-    -- rėmeliai aplink laukus, mygtukus ir blokus, kad aiškiau matytųsi ribos
-    st.WindowBorderSize = 1
-    st.ChildBorderSize  = 1
-    st.FrameBorderSize  = 1
-    st.PopupBorderSize  = 1
-    local function v4(r, g, b, a) return imgui.ImVec4(r, g, b, a or 1) end
-    c[k.WindowBg]             = v4(0, 0, 0)
-    c[k.ChildBg]              = v4(0, 0, 0, 0)
-    c[k.PopupBg]              = v4(0.02, 0.02, 0.02)
-    c[k.Border]               = v4(0.33, 0.33, 0.33)
-    c[k.TitleBg]              = v4(0, 0, 0)
-    c[k.TitleBgActive]        = v4(0.06, 0.06, 0.06)
-    c[k.TitleBgCollapsed]     = v4(0, 0, 0)
-    c[k.BorderShadow]         = v4(0, 0, 0, 0)
-    c[k.FrameBg]              = v4(0.12, 0.12, 0.12)
-    c[k.FrameBgHovered]       = v4(0.18, 0.18, 0.18)
-    c[k.FrameBgActive]        = v4(0.23, 0.23, 0.23)
-    c[k.Button]               = v4(0.16, 0.16, 0.16)
-    c[k.ButtonHovered]        = v4(0.24, 0.24, 0.24)
-    c[k.ButtonActive]         = v4(0.30, 0.30, 0.30)
-    c[k.Header]               = v4(0.20, 0.20, 0.20)
-    c[k.HeaderHovered]        = v4(0.26, 0.26, 0.26)
-    c[k.HeaderActive]         = v4(0.31, 0.31, 0.31)
-    c[k.Separator]            = v4(0.33, 0.33, 0.33)
-    c[k.SeparatorHovered]     = v4(0.45, 0.45, 0.45)
-    c[k.SeparatorActive]      = v4(0.55, 0.55, 0.55)
-    c[k.ScrollbarBg]          = v4(0, 0, 0, 0)
-    c[k.ScrollbarGrab]        = v4(0.30, 0.30, 0.30)
-    c[k.ScrollbarGrabHovered] = v4(0.38, 0.38, 0.38)
-    c[k.ScrollbarGrabActive]  = v4(0.46, 0.46, 0.46)
-    c[k.SliderGrab]           = v4(0.55, 0.55, 0.55)
-    c[k.SliderGrabActive]     = v4(0.75, 0.75, 0.75)
-    c[k.CheckMark]            = v4(0.85, 0.85, 0.85)
-    c[k.ResizeGrip]           = v4(0, 0, 0, 0)
-    c[k.ResizeGripHovered]    = v4(0.30, 0.30, 0.30)
-    c[k.ResizeGripActive]     = v4(0.45, 0.45, 0.45)
-    c[k.PlotHistogram]        = v4(0.30, 0.85, 0.30)
-    c[k.TextSelectedBg]       = v4(0.30, 0.30, 0.30)
-    c[k.ModalWindowDimBg]     = v4(0, 0, 0, 0.6)
+    local tema = nust.tema
+    local function v4(r, g, b, al) return imgui.ImVec4(r, g, b, al or 1) end
+    local function v2(x, y) return imgui.ImVec2(x, y) end
+    local A = SPALVA_AKCENTAS
+    if tema == 1 then A.x, A.y, A.z = 0.75, 0.75, 0.75
+    elseif tema == 3 then A.x, A.y, A.z = 0.22, 0.82, 0.64
+    else A.x, A.y, A.z = 0.33, 0.62, 0.98 end
+    local a = A
+
+    -- bendra visoms
+    st.WindowRounding      = 0          -- pagrindinis langas kampuotas dėl savos pavadinimo juostos
+    st.WindowBorderSize    = 1
+    st.PopupBorderSize     = 1
+    st.SelectableTextAlign = v2(0, 0.5)
+    c[k.WindowBg]          = v4(0, 0, 0)
+    c[k.TitleBg]           = v4(0, 0, 0)
+    c[k.TitleBgActive]     = v4(0.06, 0.06, 0.06)
+    c[k.TitleBgCollapsed]  = v4(0, 0, 0)
+    c[k.BorderShadow]      = v4(0, 0, 0, 0)
+    c[k.ScrollbarBg]       = v4(0, 0, 0, 0)
+    c[k.ResizeGrip]        = v4(0, 0, 0, 0)
+    c[k.PlotHistogram]     = v4(0.30, 0.85, 0.30)
+    c[k.ModalWindowDimBg]  = v4(0, 0, 0, 0.6)
+    c[k.SeparatorHovered]  = v4(a.x, a.y, a.z, 0.70)
+    c[k.SeparatorActive]   = v4(a.x, a.y, a.z)
+    c[k.ResizeGripHovered] = v4(a.x, a.y, a.z, 0.50)
+    c[k.ResizeGripActive]  = v4(a.x, a.y, a.z, 0.80)
+
+    if tema == 1 then
+        -- klasikinė: kaip iki 2.17.1
+        st.ChildBorderSize, st.FrameBorderSize = 1, 1
+        st.ChildRounding, st.FrameRounding, st.PopupRounding, st.GrabRounding, st.ScrollbarRounding = 0, 0, 0, 0, 9
+        st.WindowPadding, st.FramePadding = v2(8, 8), v2(4, 3)
+        st.ItemSpacing, st.ItemInnerSpacing = v2(8, 4), v2(4, 4)
+        st.ScrollbarSize, st.GrabMinSize = 14, 10
+        c[k.Text], c[k.TextDisabled] = v4(1, 1, 1), v4(0.50, 0.50, 0.50)
+        c[k.ChildBg], c[k.PopupBg] = v4(0, 0, 0, 0), v4(0.02, 0.02, 0.02)
+        c[k.Border], c[k.Separator] = v4(0.33, 0.33, 0.33), v4(0.33, 0.33, 0.33)
+        c[k.FrameBg], c[k.FrameBgHovered], c[k.FrameBgActive] = v4(0.12, 0.12, 0.12), v4(0.18, 0.18, 0.18), v4(0.23, 0.23, 0.23)
+        c[k.Button], c[k.ButtonHovered], c[k.ButtonActive] = v4(0.16, 0.16, 0.16), v4(0.24, 0.24, 0.24), v4(0.30, 0.30, 0.30)
+        c[k.Header], c[k.HeaderHovered], c[k.HeaderActive] = v4(0.20, 0.20, 0.20), v4(0.26, 0.26, 0.26), v4(0.31, 0.31, 0.31)
+        c[k.ScrollbarGrab], c[k.ScrollbarGrabHovered], c[k.ScrollbarGrabActive] = v4(0.30, 0.30, 0.30), v4(0.38, 0.38, 0.38), v4(0.46, 0.46, 0.46)
+        c[k.SliderGrab], c[k.SliderGrabActive] = v4(0.55, 0.55, 0.55), v4(0.75, 0.75, 0.75)
+        c[k.CheckMark], c[k.TextSelectedBg] = v4(0.85, 0.85, 0.85), v4(0.30, 0.30, 0.30)
+    elseif tema == 3 then
+        -- smaragdinė: plokščios kortelės (šviesesnis meniu ir turinio fonas), laukai be rėmelių, daugiau oro
+        st.ChildBorderSize, st.FrameBorderSize = 0, 0
+        st.ChildRounding, st.FrameRounding, st.PopupRounding, st.GrabRounding, st.ScrollbarRounding = 8, 6, 8, 6, 10
+        st.WindowPadding, st.FramePadding = v2(14, 12), v2(10, 5)
+        st.ItemSpacing, st.ItemInnerSpacing = v2(10, 7), v2(6, 4)
+        st.ScrollbarSize, st.GrabMinSize = 11, 12
+        c[k.Text], c[k.TextDisabled] = v4(0.92, 0.94, 0.93), v4(0.52, 0.58, 0.56)
+        c[k.ChildBg], c[k.PopupBg] = v4(0.055, 0.062, 0.066), v4(0.06, 0.07, 0.075)
+        c[k.Border], c[k.Separator] = v4(0.17, 0.20, 0.20), v4(0.18, 0.22, 0.22)
+        c[k.FrameBg], c[k.FrameBgHovered], c[k.FrameBgActive] = v4(0.11, 0.125, 0.13), v4(0.15, 0.175, 0.18), v4(0.18, 0.215, 0.22)
+        c[k.Button], c[k.ButtonHovered], c[k.ButtonActive] = v4(0.13, 0.15, 0.16), v4(0.11, 0.31, 0.26), v4(0.13, 0.40, 0.33)
+        c[k.Header], c[k.HeaderHovered], c[k.HeaderActive] = v4(0.08, 0.25, 0.21), v4(0.10, 0.32, 0.27), v4(0.12, 0.40, 0.33)
+        c[k.ScrollbarGrab], c[k.ScrollbarGrabHovered], c[k.ScrollbarGrabActive] = v4(0.20, 0.23, 0.23), v4(0.26, 0.31, 0.30), v4(a.x, a.y, a.z, 0.8)
+        c[k.SliderGrab], c[k.SliderGrabActive] = v4(a.x * 0.85, a.y * 0.85, a.z * 0.85), v4(a.x, a.y, a.z)
+        c[k.CheckMark], c[k.TextSelectedBg] = v4(a.x, a.y, a.z), v4(a.x, a.y, a.z, 0.30)
+    else
+        -- mėlyna (2.17.1): rėmeliai, apvalesni laukai, mėlynas akcentas
+        st.ChildBorderSize, st.FrameBorderSize = 1, 1
+        st.ChildRounding, st.FrameRounding, st.PopupRounding, st.GrabRounding, st.ScrollbarRounding = 5, 4, 6, 4, 8
+        st.WindowPadding, st.FramePadding = v2(12, 10), v2(8, 4)
+        st.ItemSpacing, st.ItemInnerSpacing = v2(8, 6), v2(6, 4)
+        st.ScrollbarSize, st.GrabMinSize = 12, 10
+        c[k.Text], c[k.TextDisabled] = v4(0.93, 0.93, 0.93), v4(0.56, 0.57, 0.60)
+        c[k.ChildBg], c[k.PopupBg] = v4(0, 0, 0, 0), v4(0.04, 0.04, 0.05)
+        c[k.Border], c[k.Separator] = v4(0.30, 0.30, 0.32), v4(0.30, 0.30, 0.32)
+        c[k.FrameBg], c[k.FrameBgHovered], c[k.FrameBgActive] = v4(0.12, 0.12, 0.12), v4(0.18, 0.18, 0.18), v4(0.23, 0.23, 0.23)
+        c[k.Button], c[k.ButtonHovered], c[k.ButtonActive] = v4(0.16, 0.16, 0.16), v4(0.24, 0.24, 0.24), v4(0.30, 0.30, 0.30)
+        c[k.Header], c[k.HeaderHovered], c[k.HeaderActive] = v4(0.14, 0.25, 0.42), v4(0.18, 0.31, 0.52), v4(0.22, 0.38, 0.62)
+        c[k.ScrollbarGrab], c[k.ScrollbarGrabHovered], c[k.ScrollbarGrabActive] = v4(0.30, 0.30, 0.30), v4(0.38, 0.38, 0.38), v4(0.46, 0.46, 0.46)
+        c[k.SliderGrab], c[k.SliderGrabActive] = v4(a.x * 0.85, a.y * 0.85, a.z * 0.85), v4(a.x, a.y, a.z)
+        c[k.CheckMark], c[k.TextSelectedBg] = v4(a.x, a.y, a.z), v4(a.x, a.y, a.z, 0.35)
+    end
 end
 
 -- HSV (0-1) -> RGB
@@ -5181,13 +5260,20 @@ local function pavadinimoJuosta(pavadinimas)
 
     if not nust.vaivorykste then
         dl:AddRectFilled(p, imgui.ImVec2(p.x + w, p.y + TITULO_AUKSTIS), 0xFF000000)
-        dl:AddLine(imgui.ImVec2(p.x, p.y + TITULO_AUKSTIS - 1), imgui.ImVec2(p.x + w, p.y + TITULO_AUKSTIS - 1), 0xFF545454)
+        dl:AddLine(imgui.ImVec2(p.x, p.y + TITULO_AUKSTIS - 1), imgui.ImVec2(p.x + w, p.y + TITULO_AUKSTIS - 1),
+            imgui.ColorConvertFloat4ToU32(imgui.ImVec4(SPALVA_AKCENTAS.x, SPALVA_AKCENTAS.y, SPALVA_AKCENTAS.z, 0.85)), 2)
         if titulinisSriftas then imgui.PushFont(titulinisSriftas) end
         local dydis = imgui.CalcTextSize(pavadinimas)
-        dl:AddText(imgui.ImVec2(p.x + 14, p.y + (TITULO_AUKSTIS - dydis.y) / 2), 0xFFFFFFFF, pavadinimas)
+        local ty = p.y + (TITULO_AUKSTIS - dydis.y) / 2
+        dl:AddText(imgui.ImVec2(p.x + 14, ty), 0xFFFFFFFF, pavadinimas)
         if titulinisSriftas then imgui.PopFont() end
+        -- versija šalia pavadinimo
+        local ver = "v" .. tostring(thisScript().version)
+        local vd = imgui.CalcTextSize(ver)
+        dl:AddText(imgui.ImVec2(p.x + 14 + dydis.x + 10, ty + dydis.y - vd.y - 1),
+            imgui.ColorConvertFloat4ToU32(imgui.GetStyle().Colors[imgui.Col.TextDisabled]), ver)
         dl:PopClipRect()
-        imgui.SetCursorPos(imgui.ImVec2(w - 36, 4))
+        imgui.SetCursorPos(imgui.ImVec2(w - 28 - imgui.GetStyle().WindowPadding.x, 4))
         imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.14, 0.14, 0.14, 1))
         imgui.PushStyleColor(imgui.Col.ButtonHovered, imgui.ImVec4(0.22, 0.22, 0.22, 1))
         imgui.PushStyleColor(imgui.Col.ButtonActive, imgui.ImVec4(0.30, 0.30, 0.30, 1))
@@ -5224,7 +5310,7 @@ local function pavadinimoJuosta(pavadinimas)
     dl:PopClipRect()
 
     -- uždarymo mygtukas
-    imgui.SetCursorPos(imgui.ImVec2(w - 36, 4))
+    imgui.SetCursorPos(imgui.ImVec2(w - 28 - imgui.GetStyle().WindowPadding.x, 4))
     imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0, 0, 0, 0.35))
     imgui.PushStyleColor(imgui.Col.ButtonHovered, imgui.ImVec4(0, 0, 0, 0.6))
     imgui.PushStyleColor(imgui.Col.ButtonActive, imgui.ImVec4(0, 0, 0, 0.8))
@@ -5295,13 +5381,21 @@ local function nickoVeiksmai(nm, tikKopijuoti)
 end
 
 imgui.OnFrame(function() return ui.atidarytas[0] end, function()
+    -- tema pakeista Nustatymuose: pritaikom prieš piešiant langą
+    if ui.temaPakeista then
+        ui.temaPakeista = false
+        juodaTema()
+        langoAlfa()
+    end
     local sx, sy = getScreenResolution()
     imgui.SetNextWindowPos(imgui.ImVec2(sx / 2, sy / 2), imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
     -- mažiausias dydis 1300x750 (mažesniame ekrane - visas ekranas), kad langas nesusitrauktų
     local minW, minH = math.min(1300, sx - 20), math.min(750, sy - 20)
     imgui.SetNextWindowSizeConstraints(imgui.ImVec2(minW, minH), imgui.ImVec2(math.max(minW, sx), math.max(minH, sy)))
     imgui.SetNextWindowSize(imgui.ImVec2(minW, minH), imgui.Cond.FirstUseEver)
-    imgui.Begin("DPKT meniu", ui.atidarytas, imgui.WindowFlags.NoCollapse + imgui.WindowFlags.NoTitleBar)
+    -- pats langas neslenka (slenka tik meniu ir turinys viduje)
+    imgui.Begin("DPKT meniu", ui.atidarytas, imgui.WindowFlags.NoCollapse + imgui.WindowFlags.NoTitleBar
+        + imgui.WindowFlags.NoScrollbar + imgui.WindowFlags.NoScrollWithMouse)
     if pavadinimoJuosta("DPKT meniu") then ui.atidarytas[0] = false end
 
     -- prasidėjo patikra: rodom jos statusą
@@ -5316,11 +5410,19 @@ imgui.OnFrame(function() return ui.atidarytas[0] end, function()
 
     -- kairysis meniu
     local apaciosAukstis = imgui.GetTextLineHeightWithSpacing() + 10
-    imgui.BeginChild("##meniu", imgui.ImVec2(190, -apaciosAukstis), true)
+    imgui.BeginChild("##meniu", imgui.ImVec2(205, -apaciosAukstis), true)
+    local MENIU_EILUTE = imgui.ImVec2(0, imgui.GetTextLineHeight() + 6)
+    -- pažymėto punkto juostelė kairėje
+    local function zymeti(pazymeta)
+        if not pazymeta then return end
+        local a, b = imgui.GetItemRectMin(), imgui.GetItemRectMax()
+        imgui.GetWindowDrawList():AddRectFilled(a, imgui.ImVec2(a.x + 3, b.y), imgui.ColorConvertFloat4ToU32(SPALVA_AKCENTAS))
+    end
     for _, s in ipairs(SKIRTUKAI) do
         if s.grupe then
             imgui.Spacing()
-            TPilkas(s.grupe)
+            imgui.Spacing()
+            T(s.grupe, imgui.ImVec4(SPALVA_AKCENTAS.x, SPALVA_AKCENTAS.y, SPALVA_AKCENTAS.z, 0.85))
             imgui.Separator()
         elseif s.id == "statusas" then
             if rodytiStatusoPunkta() then
@@ -5334,14 +5436,16 @@ imgui.OnFrame(function() return ui.atidarytas[0] end, function()
                     spalva = SPALVA_RAUDONA
                 end
                 if spalva then imgui.PushStyleColor(imgui.Col.Text, spalva) end
-                if imgui.Selectable(pav .. "##sk_" .. s.id, ui.skirtukas == s.id) then ui.skirtukas = s.id end
+                if imgui.Selectable("  " .. pav .. "##sk_" .. s.id, ui.skirtukas == s.id, 0, MENIU_EILUTE) then ui.skirtukas = s.id end
+                zymeti(ui.skirtukas == s.id)
                 if spalva then imgui.PopStyleColor() end
             end
         else
             local x = imgui.GetCursorPosX()
-            if imgui.Selectable(s.pavadinimas .. "##sk_" .. s.id, ui.skirtukas == s.id) then ui.skirtukas = s.id end
+            if imgui.Selectable("  " .. s.pavadinimas .. "##sk_" .. s.id, ui.skirtukas == s.id, 0, MENIU_EILUTE) then ui.skirtukas = s.id end
+            zymeti(ui.skirtukas == s.id)
             if s.zyma then
-                imgui.SameLine(x + imgui.CalcTextSize(s.pavadinimas).x + 6)
+                imgui.SameLine(x + imgui.CalcTextSize("  " .. s.pavadinimas).x + 6)
                 T(s.zyma, SPALVA_GELTONA)
             end
         end

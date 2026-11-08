@@ -4,6 +4,14 @@ Autorius: Dex. Naujausia versija viršuje.
 
 Versijos: 1 – dialogų versija, 2 – mimgui. 2.x.x: vidurinis skaičius keičiasi su didesniais pakeitimais, paskutinis – su smulkiais.
 
+## 2.17.1
+- Nustatymuose (Išvaizda) – temos: Klasikinė (kaip anksčiau), Mėlyna (pagal nutylėjimą) ir Smaragdinė. Persijungia iškart.
+- Smaragdinė: plokščios kortelės be rėmelių, daugiau oro, žaliai mėlynas akcentas. Mėlyna: rėmeliai, apvalesni laukai ir mygtukai, mėlynas akcentas.
+- Kairiajame meniu – aukštesni punktai, pažymėtas punktas su akcento spalvos juostele, grupių pavadinimai akcento spalva.
+- Skilčių pavadinimai storu šriftu, pavadinimo juostoje šalia – versija, apačioje – akcento spalvos linija.
+- Pagrindiniame – /dpversija komandų sąraše.
+- Pagrindinis langas nebeslenka horizontaliai laikant Shift ir sukant ratuką.
+
 ## 2.17.0 – Versijos pasirinkimas
 - Nustatymuose „Versijos pasirinkimas“ (arba komanda /dpversija): galima įdiegti ankstesnę versiją iš GitHub – 27 išlikusios versijos nuo v3.4 iki dabartinės (v3.4–v5.8 – sena numeracija, iki 2.9.0).
 - Pasirinkta ne naujausia versija prisegama: automatiniai atnaujinimai jos nebekeičia, kol vėl nepasirenkama naujausia. Įkėlus scriptą chate primenama, kad versija prisegta.
