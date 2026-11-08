@@ -1,0 +1,134 @@
+{
+ "versijos": [
+  {
+   "versija": "2.16.1",
+   "failas": "versijos/dpmenu2161.lua",
+   "pastaba": ""
+  },
+  {
+   "versija": "2.16.0",
+   "failas": "versijos/dpmenu2160.lua",
+   "pastaba": ""
+  },
+  {
+   "versija": "2.15.3",
+   "failas": "versijos/dpmenu2153.lua",
+   "pastaba": ""
+  },
+  {
+   "versija": "2.15.2",
+   "failas": "versijos/dpmenu2152.lua",
+   "pastaba": ""
+  },
+  {
+   "versija": "2.15.1",
+   "failas": "versijos/dpmenu2151.lua",
+   "pastaba": ""
+  },
+  {
+   "versija": "2.15.0",
+   "failas": "versijos/dpmenu2150.lua",
+   "pastaba": ""
+  },
+  {
+   "versija": "2.14.0",
+   "failas": "versijos/dpmenu2140.lua",
+   "pastaba": ""
+  },
+  {
+   "versija": "2.13.1",
+   "failas": "versijos/dpmenu2131.lua",
+   "pastaba": ""
+  },
+  {
+   "versija": "2.13.0",
+   "failas": "versijos/dpmenu2130.lua",
+   "pastaba": ""
+  },
+  {
+   "versija": "2.12.2",
+   "failas": "versijos/dpmenu2122.lua",
+   "pastaba": ""
+  },
+  {
+   "versija": "2.12.0",
+   "failas": "versijos/dpmenu2120.lua",
+   "pastaba": ""
+  },
+  {
+   "versija": "2.11.2",
+   "failas": "versijos/dpmenu2112.lua",
+   "pastaba": ""
+  },
+  {
+   "versija": "2.11.1",
+   "failas": "versijos/dpmenu2111.lua",
+   "pastaba": ""
+  },
+  {
+   "versija": "2.11.0",
+   "failas": "versijos/dpmenu2110.lua",
+   "pastaba": ""
+  },
+  {
+   "versija": "2.10.4",
+   "failas": "versijos/dpmenu2104.lua",
+   "pastaba": "be automatinių atnaujinimų"
+  },
+  {
+   "versija": "2.10.0",
+   "failas": "versijos/dpmenu2100.lua",
+   "pastaba": "be automatinių atnaujinimų"
+  },
+  {
+   "versija": "2.9.0",
+   "failas": "versijos/dpmenu290.lua",
+   "pastaba": "be automatinių atnaujinimų"
+  },
+  {
+   "versija": "5.8",
+   "failas": "versijos/dpmenu58.lua",
+   "pastaba": "sena numeracija (prieš 2.9.0)"
+  },
+  {
+   "versija": "5.4",
+   "failas": "versijos/dpmenu54.lua",
+   "pastaba": "sena numeracija (prieš 2.9.0)"
+  },
+  {
+   "versija": "4.7",
+   "failas": "versijos/dpmenu47.lua",
+   "pastaba": "sena numeracija (prieš 2.9.0)"
+  },
+  {
+   "versija": "4.4",
+   "failas": "versijos/dpmenu44.lua",
+   "pastaba": "sena numeracija (prieš 2.9.0)"
+  },
+  {
+   "versija": "4.3",
+   "failas": "versijos/dpmenu43.lua",
+   "pastaba": "sena numeracija (prieš 2.9.0)"
+  },
+  {
+   "versija": "3.8",
+   "failas": "versijos/dpmenu38.lua",
+   "pastaba": "sena numeracija (prieš 2.9.0)"
+  },
+  {
+   "versija": "3.7",
+   "failas": "versijos/dpmenu37.lua",
+   "pastaba": "sena numeracija (prieš 2.9.0)"
+  },
+  {
+   "versija": "3.6",
+   "failas": "versijos/dpmenu36.lua",
+   "pastaba": "sena numeracija (prieš 2.9.0)"
+  },
+  {
+   "versija": "3.4",
+   "failas": "versijos/dpmenu34.lua",
+   "pastaba": "sena numeracija (prieš 2.9.0)"
+  }
+ ]
+}
