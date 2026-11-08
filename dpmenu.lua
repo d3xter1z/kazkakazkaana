@@ -1,6 +1,6 @@
 script_name("DPKT meniu")
 script_author("Dex")
-script_version("2.17.1")
+script_version("2.18.0")
 
 require "lib.moonloader"
 local sampev = require "lib.samp.events"
@@ -162,6 +162,7 @@ local FAILAI = {
     aktyvumas   = DUOMENU_APLANKAS .. "\\aktyvumas.json",
     suvestine   = DUOMENU_APLANKAS .. "\\suvestine.json",    -- paskutinė direktorių savaitės suvestinė
     juodieji    = DUOMENU_APLANKAS .. "\\juodieji.json",     -- juodieji sąrašai iš sarg.lt
+    serverio    = DUOMENU_APLANKAS .. "\\serverio_pranesimai.json",   -- G kill ir /kick istorija
     juodiejiHtml = DUOMENU_APLANKAS .. "\\juodieji.html",    -- rankiniu būdu išsaugotas puslapis (Ctrl+S)
     nustatymai  = DUOMENU_APLANKAS .. "\\nustatymai.json",
     atnaujinta  = DUOMENU_APLANKAS .. "\\atnaujinta.txt",   -- po atnaujinimo: iš kurios versijos
@@ -1236,7 +1237,88 @@ local rinkimas = {
 
 local TOKIOS_KOMANDOS_NERA = ltu("Tokios komandos nėra")
 
+---------------------------------------------------------------- SERVERIO PRANEŠIMAI (G kill, /kick)
+-- Renkami iš chato, kol žaidėjas prisijungęs; istorija saugoma faile.
+--   "[Serveris] Luck_Corvelli (40) tikriausiai nužudė Dyzel_God (20) lipdamas į tr. priemonę"
+--   "[Serveris] Naikon_Glitched[9]: išmetė (kick) Chrome_Incognito[54] iš serverio už priežastis."
+local serverioPranesimai = {
+    gkill = {}, kick = {},       -- naujausi gale: { laikas, data, ... }
+    ikelta = false, RIBA = 5000, -- kiek įrašų laikyti kiekvieno tipo
+    rodoma = "gkill", paieska = new.char[64](), tikSiandien = new.bool(false), atsitiktiniai = false,
+}
+
+function serverioPranesimai.ikelti()
+    if serverioPranesimai.ikelta then return end
+    serverioPranesimai.ikelta = true
+    local d = skaitytiJson(FAILAI.serverio)
+    if type(d) == "table" then
+        if type(d.gkill) == "table" then serverioPranesimai.gkill = d.gkill end
+        if type(d.kick) == "table" then serverioPranesimai.kick = d.kick end
+    end
+end
+
+function serverioPranesimai.issaugoti()
+    if serverioPranesimai.atsitiktiniai then return end
+    rasytiJson(FAILAI.serverio, { gkill = serverioPranesimai.gkill, kick = serverioPranesimai.kick })
+end
+
+function serverioPranesimai.prideti(sarasas, irasas)
+    local SP = serverioPranesimai
+    SP.ikelti()
+    if SP.atsitiktiniai then
+        -- tikri įrašai neturi maišytis su Dev duomenimis
+        SP.atsitiktiniai, SP.ikelta, SP.gkill, SP.kick = false, false, {}, {}
+        SP.ikelti()
+    end
+    irasas.laikas, irasas.data = os.time(), os.date("%Y-%m-%d %H:%M:%S")
+    local t = SP[sarasas]
+    t[#t + 1] = irasas
+    while #t > SP.RIBA do table.remove(t, 1) end
+    SP.issaugoti()
+end
+
+-- iš onServerMessage (tekstas cp1257); chato nekeičia ir neslepia
+function serverioPranesimai.tikrinti(tekstas)
+    local e = nuimtiSpalvas(u8(tekstas or ""))
+    if not e:find("[Serveris]", 1, true) then return end
+    if e:find("tikriausiai nužudė", 1, true) then
+        -- "Zudikas (40) tikriausiai nužudė Auka (20) lipdamas ..."; ID gali nebūti
+        local zd, ad = e:match("%[Serveris%]%s*(.-)%s+tikriausiai nužudė%s+(.-)%s+lipdamas")
+        if not zd then zd, ad = e:match("%[Serveris%]%s*(.-)%s+tikriausiai nužudė%s+(%S+)") end
+        if zd then
+            local function nickIrId(x)
+                x = apkarpyti(x)
+                local n, id = x:match("^(%S+)%s*%((%d+)%)$")
+                return n or x, tonumber(id)
+            end
+            local zudikas, zid = nickIrId(zd)
+            local auka, aid = nickIrId(ad)
+            serverioPranesimai.prideti("gkill", { zudikas = zudikas, zudikoId = zid, auka = auka, aukosId = aid,
+                tekstas = apkarpyti(e) })
+        end
+    elseif e:find("išmetė (kick)", 1, true) then
+        -- "Admin[9]: išmetė (kick) Zaidejas[54] iš serverio už ..."; ID gali nebūti (pvz. žaidėjas jau atsijungęs)
+        local adminoDalis, likes = e:match("%[Serveris%]%s*(.-):%s*išmetė %(kick%)%s*(.*)$")
+        if adminoDalis then
+            local zaidejoDalis = likes:match("^(%S+)") or "?"
+            local function nickIrId(x)
+                x = apkarpyti(x)
+                local n, id = x:match("^(.-)%[(%d+)%]$")
+                return n or x, tonumber(id)
+            end
+            local adminas, adid = nickIrId(adminoDalis)
+            local zaidejas, zid = nickIrId(zaidejoDalis)
+            local priezastis = likes:match("iš serverio už%s*(.-)%s*$") or ""
+            priezastis = apkarpyti((priezastis:gsub("%.$", "")))
+            serverioPranesimai.prideti("kick", { adminas = adminas, adminoId = adid, zaidejas = zaidejas,
+                zaidejoId = zid, priezastis = priezastis, tekstas = apkarpyti(e) })
+        end
+    end
+end
+
 function sampev.onServerMessage(spalva, tekstas)
+    -- G kill ir /kick pranešimai įrašomi į istoriją (chatas nekeičiamas)
+    pcall(serverioPranesimai.tikrinti, tekstas)
     if derinimas.aktyvus() then
         local zyme = ""
         local d = atpazintiDarbuotoja(tekstas)
@@ -2946,6 +3028,7 @@ local SKIRTUKAI = {
     { id = "fondai",      pavadinimas = "Darbų fondai" },
     { id = "aktyvumas",   pavadinimas = "Aktyvumas" },
     { id = "sutapimas",   pavadinimas = "Paskyrų sutapimas" },
+    { id = "serverio",    pavadinimas = "Serverio pranešimai" },
     { grupe = "Event" },
     { id = "ef_mg",       pavadinimas = "Mafijų, gaujų fondas" },
     { id = "ef_t",        pavadinimas = "Teisėsaugos fondas" },
@@ -3128,6 +3211,11 @@ end
 -- Po kiekvieno atnaujinimo čia pridedamas naujas įrašas (ir pakeičiamas script_version).
 -- Versijų istorija (naujausia viršuje). Rodoma skiltyje „Pakeitimai“.
 local PAKEITIMAI = {
+    { versija = "2.18.0", pavadinimas = "Serverio pranešimai", pakeitimai = {
+        "Nauja skiltis „Serverio pranešimai“ (Analizės įrankiai): „G kill pranešimai“ (kas ką nužudė lipdamas į tr. priemonę) ir „/kick'ai“ (adminas, žaidėjas, priežastis).",
+        "Pranešimai renkami iš chato tik kol esi ON (su nuleistu žaidimu be Anti-ESC – ne) – tai parašyta raudonai skilties viršuje. Istorija saugoma faile (config\\dpkt\\serverio_pranesimai.json), lieka perkrovus.",
+        "Paieška pagal nicką, „Tik šiandien“, kopijavimas, istorijos išvalymas. Paspaudus nicką – nukopijuojamas.",
+    } },
     { versija = "2.17.1", pakeitimai = {
         "Nustatymuose (Išvaizda) – temos: Klasikinė (kaip anksčiau), Mėlyna (pagal nutylėjimą) ir Smaragdinė. Persijungia iškart.",
         "Smaragdinė: plokščios kortelės be rėmelių, daugiau oro, žaliai mėlynas akcentas. Mėlyna: rėmeliai, apvalesni laukai ir mygtukai, mėlynas akcentas.",
@@ -3374,6 +3462,7 @@ local PAGRINDINIO_KOMANDOS = {
 local PAGRINDINIO_SKILTYS = {
     { "Darbų patikra",  "Užsideda tau darbo direktorių, patikrina /dfondas ir /visidarbuotojai, nusiima ir parodo darbo analizę." },
     { "Pakeisti darbą", "Pakeičia tavo darbą per /noriudarbo." },
+    { "Serverio pranešimai", "G kill pranešimų ir /kick'ų istorija iš chato (renkama tik kol esi prisijungęs), su paieška." },
     { "Blist",          "Įtraukia žaidėją į juodąjį sąrašą: tipas, nickas, mėnesiai (1-60), priežastis. Apačioje - sarg.lt juodieji sąrašai su paieška, prisijungę ir sąraše žaidėjai raudonai." },
     { "Direktoriai",    "Rodo visus direktorius ir pavaduotojus, kas prisijungę. Paspaudus ant darbo: "
                         .. "fondas, darbuotojai, aktyvumas, statuso atėmimas." },
@@ -3512,6 +3601,138 @@ local function rodytiDarboKeitima()
         imgui.NextColumn()
     end
     imgui.Columns(1)
+end
+
+-- skiltis "Serverio pranešimai"
+function serverioPranesimai.atsitiktiniai_()
+    local SP = serverioPranesimai
+    local function nick() return VARDAI[math.random(#VARDAI)] .. "_" .. PAVARDES[math.random(#PAVARDES)] end
+    SP.gkill, SP.kick = {}, {}
+    local dabar = os.time()
+    for i = 1, math.random(15, 40) do
+        local l = dabar - math.random(0, 10 * 86400)
+        SP.gkill[i] = { laikas = l, data = os.date("%Y-%m-%d %H:%M:%S", l), zudikas = i % 4 == 0 and "Luck_Corvelli" or nick(),
+            zudikoId = math.random(0, 300), auka = nick(), aukosId = math.random(0, 300) }
+    end
+    for i = 1, math.random(10, 30) do
+        local l = dabar - math.random(0, 10 * 86400)
+        SP.kick[i] = { laikas = l, data = os.date("%Y-%m-%d %H:%M:%S", l), adminas = nick(), adminoId = math.random(0, 300),
+            zaidejas = nick(), zaidejoId = math.random(0, 300), priezastis = ({ "", "AFK", "bugų naudojimas", "netinkamas nickas", "flood" })[math.random(5)] }
+    end
+    table.sort(SP.gkill, function(a, b) return a.laikas < b.laikas end)
+    table.sort(SP.kick, function(a, b) return a.laikas < b.laikas end)
+    SP.atsitiktiniai, SP.ikelta = true, true
+end
+
+function serverioPranesimai.rodyti()
+    local SP = serverioPranesimai
+    SP.ikelti()
+    T("Serverio pranešimai", nil, true)
+    T("Ši funkcija veikia tik kol esi ON: pranešimai įrašomi tik tada, kai pats esi prisijungęs ir juos matai chate.",
+        SPALVA_RAUDONA)
+    T("Su nuleistu žaidimu (be Anti-ESC) įrašai irgi nesaugomi.", SPALVA_RAUDONA)
+    TPilkas("Istorija saugoma faile moonloader\\config\\dpkt\\serverio_pranesimai.json.")
+    if SP.atsitiktiniai then T("Dev režimas: rodomi atsitiktiniai duomenys (į failą nerašomi).", SPALVA_GELTONA) end
+    imgui.Separator()
+
+    local siandien = os.date("%Y-%m-%d")
+    for _, x in ipairs({ { "gkill", "G kill pranešimai" }, { "kick", "/kick'ai" } }) do
+        local t = SP[x[1]]
+        local zyme = string.format("%s (%d)##sp_%s", x[2], #t, x[1])
+        local paspausta
+        if SP.rodoma == x[1] then
+            paspausta = spalvotasMygtukas(zyme, imgui.ImVec4(SPALVA_AKCENTAS.x * 0.55, SPALVA_AKCENTAS.y * 0.55,
+                SPALVA_AKCENTAS.z * 0.55, 1), imgui.ImVec2(260, 0))
+        else
+            paspausta = imgui.Button(zyme, imgui.ImVec2(260, 0))
+        end
+        if paspausta then SP.rodoma = x[1] end
+        imgui.SameLine()
+    end
+    if nust.dev and imgui.SmallButton("Sugeneruoti (Dev)##sp") then SP.atsitiktiniai_() end
+    imgui.NewLine()
+
+    imgui.PushItemWidth(220)
+    imgui.InputText("Paieška (nickas)##sp_p", SP.paieska, ffi.sizeof(SP.paieska))
+    imgui.PopItemWidth()
+    imgui.SameLine()
+    imgui.Checkbox("Tik šiandien##sp_s", SP.tikSiandien)
+    local p = skaityti(SP.paieska):lower()
+
+    local gk = SP.rodoma == "gkill"
+    local t = SP[SP.rodoma]
+    local rodomi = {}
+    for i = #t, 1, -1 do   -- naujausi viršuje
+        local r = t[i]
+        local nickai = gk and ((r.zudikas or "") .. " " .. (r.auka or "")) or ((r.adminas or "") .. " " .. (r.zaidejas or ""))
+        if (p == "" or nickai:lower():find(p, 1, true)) and (not SP.tikSiandien[0] or (r.data or ""):sub(1, 10) == siandien) then
+            rodomi[#rodomi + 1] = r
+        end
+    end
+
+    imgui.SameLine()
+    if imgui.SmallButton("Kopijuoti##sp_k") then
+        local eil = {}
+        for _, r in ipairs(rodomi) do
+            eil[#eil + 1] = gk and string.format("%s | %s (%s) -> %s (%s)", r.data, r.zudikas, tostring(r.zudikoId), r.auka, tostring(r.aukosId))
+                or string.format("%s | %s -> %s | %s", r.data, r.adminas, r.zaidejas, (r.priezastis ~= "" and r.priezastis) or "-")
+        end
+        kopijavimas.kopijuoti(table.concat(eil, "\n"), "sp_visi")
+    end
+    imgui.SameLine()
+    if imgui.SmallButton("Išvalyti istoriją##sp_i") then
+        local tipas = SP.rodoma
+        paklausti("Ištrinti visą " .. (gk and "G kill" or "/kick") .. " istoriją?", function()
+            SP[tipas] = {}
+            SP.issaugoti()
+        end)
+    end
+
+    imgui.Spacing()
+    if #rodomi == 0 then
+        TPilkas(#t == 0 and "Kol kas nieko neįrašyta." or "Nieko nerasta.")
+        return
+    end
+    imgui.BeginChild("##sp_lentele", imgui.ImVec2(0, 0), false)
+    if gk then
+        lentelesStulpeliai(3, "##sp_g", true)
+        imgui.SetColumnWidth(0, 170)
+        imgui.SetColumnWidth(1, 260)
+        for _, a in ipairs({ "Laikas", "Žudikas (ID)", "Auka (ID)" }) do TPilkas(a) imgui.NextColumn() end
+    else
+        lentelesStulpeliai(4, "##sp_k", true)
+        imgui.SetColumnWidth(0, 170)
+        imgui.SetColumnWidth(1, 230)
+        imgui.SetColumnWidth(2, 230)
+        for _, a in ipairs({ "Laikas", "Adminas", "Žaidėjas", "Priežastis" }) do TPilkas(a) imgui.NextColumn() end
+    end
+    imgui.Separator()
+    -- nicką paspaudus - nukopijuojama
+    local function nickas(n, id, raktas)
+        n = n or "?"
+        local ka = kopijavimas.raktas == raktas and localClock() - (kopijavimas.t or 0) < 1.5
+        if imgui.Selectable((ka and "Nukopijuota!" or (n .. (id and (" (" .. id .. ")") or ""))) .. "##" .. raktas, false, 0,
+                imgui.ImVec2(imgui.CalcTextSize(n .. " (000)").x, 0)) then
+            kopijavimas.kopijuoti(n, raktas)
+        end
+        if imgui.IsItemHovered() then imgui.SetTooltip("Paspaudus nukopijuojamas nickas") end
+    end
+    for i, r in ipairs(rodomi) do
+        TPilkas(r.data or "") imgui.NextColumn()
+        if gk then
+            nickas(r.zudikas, r.zudikoId, "sp_z" .. i) imgui.NextColumn()
+            nickas(r.auka, r.aukosId, "sp_a" .. i) imgui.NextColumn()
+        else
+            nickas(r.adminas, r.adminoId, "sp_ad" .. i) imgui.NextColumn()
+            nickas(r.zaidejas, r.zaidejoId, "sp_za" .. i) imgui.NextColumn()
+            local pr = (r.priezastis and r.priezastis ~= "") and r.priezastis or "-"
+            if pr == "-" then TPilkas(pr) else T(pr) end
+            if imgui.IsItemHovered() and #pr > 40 then imgui.SetTooltip(pr) end
+            imgui.NextColumn()
+        end
+    end
+    stulpeliuPabaiga()
+    imgui.EndChild()
 end
 
 -- Blist skilties apačia: sarg.lt juodieji sąrašai su paieška; prisijungę ir sąraše - raudonai
@@ -4861,6 +5082,7 @@ local TURINYS = {
     fondai = rodytiFondus,
     aktyvumas = rodytiAktyvuma,
     sutapimas = rodytiSutapima,
+    serverio = function() serverioPranesimai.rodyti() end,
     nustatymai = rodytiNustatymus,
 }
 

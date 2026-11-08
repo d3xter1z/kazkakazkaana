@@ -4,6 +4,11 @@ Autorius: Dex. Naujausia versija viršuje.
 
 Versijos: 1 – dialogų versija, 2 – mimgui. 2.x.x: vidurinis skaičius keičiasi su didesniais pakeitimais, paskutinis – su smulkiais.
 
+## 2.18.0 – Serverio pranešimai
+- Nauja skiltis „Serverio pranešimai“ (Analizės įrankiai): „G kill pranešimai“ (kas ką nužudė lipdamas į tr. priemonę) ir „/kick'ai“ (adminas, žaidėjas, priežastis).
+- Pranešimai renkami iš chato tik kol esi ON (su nuleistu žaidimu be Anti-ESC – ne) – tai parašyta raudonai skilties viršuje. Istorija saugoma faile (config\dpkt\serverio_pranesimai.json), lieka perkrovus.
+- Paieška pagal nicką, „Tik šiandien“, kopijavimas, istorijos išvalymas. Paspaudus nicką – nukopijuojamas.
+
 ## 2.17.1
 - Nustatymuose (Išvaizda) – temos: Klasikinė (kaip anksčiau), Mėlyna (pagal nutylėjimą) ir Smaragdinė. Persijungia iškart.
 - Smaragdinė: plokščios kortelės be rėmelių, daugiau oro, žaliai mėlynas akcentas. Mėlyna: rėmeliai, apvalesni laukai ir mygtukai, mėlynas akcentas.
