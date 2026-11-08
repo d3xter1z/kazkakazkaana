@@ -1,6 +1,6 @@
 script_name("DPKT meniu")
 script_author("Dex")
-script_version("2.16.0")
+script_version("2.16.1")
 
 require "lib.moonloader"
 local sampev = require "lib.samp.events"
@@ -1756,6 +1756,8 @@ local eventFondai = {
     duomenys = {},     -- [id] = { likutis, irasai = { { data, vardas, suma } }, gauta, atsitiktiniai }
     kraunama = nil,    -- id, kol laukiama serverio atsakymo
     klaida = {},       -- [id] = tekstas
+    beDuoti = {},      -- [id] = true, kai serveris atsakė, kad /mgduoti (ar kt.) neturi prieigos
+    duodama = nil,     -- localClock(), kol laukiama serverio atsakymo į /mgduoti (ar kt.); po 5 s nebelaikoma
     matomas = false,   -- ar skiltis rodoma (kad atidarius užklausa būtų siunčiama tik vieną kartą)
     paieska = new.char[32](),
     nickas = new.char[32](),
@@ -1846,12 +1848,28 @@ function eventFondai.duoti(id, nickas, suma)
         pranesimas(string.format("Dev režimas: būtų išsiųsta %s (atsitiktiniai duomenys, nieko nesiųsta).", komanda))
         return
     end
-    if uzimtas or rinkimas.efondas then klaida("Palauk, kol baigsis ankstesnis veiksmas.") return end
+    if uzimtas or rinkimas.efondas or (eventFondai.duodama and localClock() - eventFondai.duodama < 5) then
+        klaida("Palauk, kol baigsis ankstesnis veiksmas.")
+        return
+    end
+    -- "Davei" rašom tik įsitikinę, kad serveris neatsakė "Tokios komandos nėra" (prieigos nėra)
+    eventFondai.duodama = localClock()
+    prieiga.klaida = nil
     siusti(komanda)
-    pranesimas(string.format("Davei %s € iš %s fondo žaidėjui %s (%s).", formatuotiSuma(suma), f.pavadinimas, nickas, komanda))
     lua_thread.create(function()
+        local pradzia = localClock()
+        while not prieiga.klaida and localClock() - pradzia < math.max(LAUKTI_ILGIAUSIAI, 1.5) do wait(50) end
+        eventFondai.duodama = nil
+        if prieiga.klaida then
+            -- "Neturi prieigos prie komandos /mgduoti." jau parašė bendras "Tokios komandos nėra" apdorojimas
+            eventFondai.beDuoti[id] = true
+            prieiga.klaida = nil
+            return
+        end
+        eventFondai.beDuoti[id] = nil
+        pranesimas(string.format("Davei %s € iš %s fondo žaidėjui %s (%s).", formatuotiSuma(suma), f.pavadinimas, nickas, komanda))
         prieiga.pauze()
-        if not prieiga.klaida then eventFondai.atnaujinti(id) end
+        eventFondai.atnaujinti(id)
     end)
 end
 
@@ -3099,6 +3117,9 @@ end
 -- Po kiekvieno atnaujinimo čia pridedamas naujas įrašas (ir pakeičiamas script_version).
 -- Versijų istorija (naujausia viršuje). Rodoma skiltyje „Pakeitimai“.
 local PAKEITIMAI = {
+    { versija = "2.16.1", pakeitimai = {
+        "Event fonduose „Davei ... €“ parašoma tik įsitikinus, kad serveris neatsakė „Tokios komandos nėra“. Be prieigos prie /mgduoti, /tduoti ar /eduoti rašoma tik „Neturi prieigos prie komandos ...“, o „Duoti pinigų“ lange tai primenama.",
+    } },
     { versija = "2.16.0", pavadinimas = "Juodieji sąrašai", pakeitimai = {
         "Blist skiltyje – sarg.lt juodieji sąrašai (Mafijos/gaujos, Teisėsaugos, Direktorių, Darbų su pakvietimais): nickas, priežastis, nuo, iki, terminas, kas įtraukė. Pirmą kartą atidarius parsiunčiama iš sarg.lt automatiškai, paskui – mygtuku „Atnaujinti iš sarg.lt“. Sąrašas išsaugomas ir lieka perkrovus scriptą.",
         "Prisijungę ir sąraše esantys žaidėjai rodomi raudonai (su žaliu tašku), antraštėje – kiek tokių yra.",
@@ -5019,6 +5040,9 @@ function eventFondai.langai()
         local suma = tonumber((skaityti(E.suma):gsub("[%s%.,€]", ""))) or 0
         if suma > 0 then TPilkas("= " .. formatuotiSuma(suma) .. " €") end
         if E.duotiKlaida then T(E.duotiKlaida, SPALVA_RAUDONA) end
+        if E.beDuoti[f.id] then
+            T("Paskutinį kartą serveris atsakė, kad neturi prieigos prie " .. f.duoti:match("^(/%S+)") .. ".", SPALVA_RAUDONA)
+        end
         imgui.Spacing()
         if spalvotasMygtukas("Duoti", MYGTUKAS_ZALIAS, imgui.ImVec2(120, 0)) then
             local nickas = skaityti(E.nickas)

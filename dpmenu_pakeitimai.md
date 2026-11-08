@@ -4,6 +4,9 @@ Autorius: Dex. Naujausia versija viršuje.
 
 Versijos: 1 – dialogų versija, 2 – mimgui. 2.x.x: vidurinis skaičius keičiasi su didesniais pakeitimais, paskutinis – su smulkiais.
 
+## 2.16.1
+- Event fonduose „Davei ... €“ parašoma tik įsitikinus, kad serveris neatsakė „Tokios komandos nėra“. Be prieigos prie /mgduoti, /tduoti ar /eduoti rašoma tik „Neturi prieigos prie komandos ...“, o „Duoti pinigų“ lange tai primenama.
+
 ## 2.16.0 – Juodieji sąrašai
 - Blist skiltyje – sarg.lt juodieji sąrašai (Mafijos/gaujos, Teisėsaugos, Direktorių, Darbų su pakvietimais): nickas, priežastis, nuo, iki, terminas, kas įtraukė. Pirmą kartą atidarius parsiunčiama iš sarg.lt automatiškai, paskui – mygtuku „Atnaujinti iš sarg.lt“. Sąrašas išsaugomas ir lieka perkrovus scriptą.
 - Prisijungę ir sąraše esantys žaidėjai rodomi raudonai (su žaliu tašku), antraštėje – kiek tokių yra.
