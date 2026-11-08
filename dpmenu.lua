@@ -1,6 +1,6 @@
 script_name("DPKT meniu")
 script_author("Dex")
-script_version("2.16.1")
+script_version("2.17.0")
 
 require "lib.moonloader"
 local sampev = require "lib.samp.events"
@@ -3117,6 +3117,11 @@ end
 -- Po kiekvieno atnaujinimo čia pridedamas naujas įrašas (ir pakeičiamas script_version).
 -- Versijų istorija (naujausia viršuje). Rodoma skiltyje „Pakeitimai“.
 local PAKEITIMAI = {
+    { versija = "2.17.0", pavadinimas = "Versijos pasirinkimas", pakeitimai = {
+        "Nustatymuose „Versijos pasirinkimas“ (arba komanda /dpversija): galima įdiegti ankstesnę versiją iš GitHub – 27 išlikusios versijos nuo v3.4 iki dabartinės (v3.4–v5.8 – sena numeracija, iki 2.9.0).",
+        "Pasirinkta ne naujausia versija prisegama: automatiniai atnaujinimai jos nebekeičia, kol vėl nepasirenkama naujausia. Įkėlus scriptą chate primenama, kad versija prisegta.",
+        "Į visas archyvines versijas pridėtas /dpversija, tad grįžti galima iš bet kurios. Senesnės versijos gali nepalaikyti versijos parinkimo meniu – jose naudok /dpversija.",
+    } },
     { versija = "2.16.1", pakeitimai = {
         "Event fonduose „Davei ... €“ parašoma tik įsitikinus, kad serveris neatsakė „Tokios komandos nėra“. Be prieigos prie /mgduoti, /tduoti ar /eduoti rašoma tik „Neturi prieigos prie komandos ...“, o „Duoti pinigų“ lange tai primenama.",
     } },
@@ -4693,6 +4698,16 @@ local function rodytiNustatymus()
     end
     imgui.SameLine()
     TPilkas("v" .. tostring(thisScript().version) .. (atnaujinimai.busena and ("   " .. atnaujinimai.busena) or ""))
+    if imgui.Button("Versijos pasirinkimas") and DPKT_VERSIJOS_ATIDARYTI then DPKT_VERSIJOS_ATIDARYTI() end
+    if imgui.IsItemHovered() then
+        imgui.SetTooltip("Įdiegti bet kurią ankstesnę versiją iš GitHub (taip pat /dpversija)")
+    end
+    imgui.SameLine()
+    TPilkas("Senesnės versijos gali nepalaikyti versijos parinkimo.")
+    if DPKT_PRISEGTA then
+        T("Versija v" .. DPKT_PRISEGTA .. " prisegta: automatiniai atnaujinimai jos nekeičia. Grįžti - pasirink naujausią.",
+            SPALVA_GELTONA)
+    end
 
     skyrius("Išvaizda")
     slankiklisInt("sriftas", "Šrifto dydis", 12, 24, "%d")
@@ -5868,7 +5883,8 @@ function main()
         sampAddChatMessage(saugusLtu("* DPKT meniu - " .. tekstas), ZALIA)
         pranesimas(tekstas)
     end
-    if nust.autoAtnaujinimai then atnaujinimai.tikrinti(false) end
+    -- prisegtos (per /dpversija pasirinktos) versijos automatiškai nekeičiam
+    if nust.autoAtnaujinimai and not DPKT_PRISEGTA then atnaujinimai.tikrinti(false) end
     if nust.zurnalas then
         derinimas.valyti(false)
         derinimas.rasyti(string.format("==================== DPKT meniu v%s įkeltas ====================", tostring(thisScript().version)))
@@ -5890,3 +5906,182 @@ end
 function onScriptTerminate(skriptas)
     if skriptas == thisScript() then pcall(derinimas.issaugoti) end
 end
+
+-- >>> DPKT versijos pasirinkimas
+--------------------------------------------------------------------------------
+-- Versijos pasirinkimas iš GitHub (/dpversija). Savarankiškas blokas: toks pat pridėtas
+-- ir prie archyvinių versijų (versijos/dpmenuXYZ.lua), kad iš bet kurios būtų galima grįžti.
+-- Pasirinkus ne naujausią versiją ji "prisegama" (config\dpkt\prisegta_versija.txt) ir
+-- automatiniai atnaujinimai jos nebekeičia, kol nepasirenkama naujausia.
+--------------------------------------------------------------------------------
+do (function()
+    local imgui = require "mimgui"
+    local koduote = require "encoding"
+    koduote.default = "CP1257"
+    local utf8 = koduote.UTF8
+    local REPO = "https://raw.githubusercontent.com/d3xter1z/kazkakazkaana/main/"
+    local APLANKAS = getWorkingDirectory() .. "\\config\\dpkt"
+    local PRISEGTA = APLANKAS .. "\\prisegta_versija.txt"
+    local ATNAUJINTA = APLANKAS .. "\\atnaujinta.txt"
+    local V = { langas = imgui.new.bool(false), sarasas = nil, pasirinkta = 1, busena = nil, vyksta = false, klausti = false }
+
+    local function skaityti(kelias)
+        local f = io.open(kelias, "rb")
+        if not f then return nil end
+        local t = f:read("*a")
+        f:close()
+        return t
+    end
+    local function rasyti(kelias, tekstas)
+        if not doesDirectoryExist(APLANKAS) then createDirectory(APLANKAS) end
+        local f = io.open(kelias, "wb")
+        if not f then return false end
+        f:write(tekstas)
+        f:close()
+        return true
+    end
+    local function chat(tekstas)
+        local ok, t = pcall(function() return utf8:decode(tekstas) end)
+        sampAddChatMessage(ok and t or tekstas, 0x33AA33)
+    end
+    local function dabartine() return tostring(thisScript().version) end
+
+    -- prisegta tik tada, kai prisegta būtent ši versija (įkėlus kitą failą ranka - nebegalioja)
+    local prisegta = (skaityti(PRISEGTA) or ""):match("^%s*(.-)%s*$")
+    if prisegta ~= "" and prisegta == dabartine() then
+        DPKT_PRISEGTA = prisegta
+    else
+        DPKT_PRISEGTA = nil
+        if prisegta ~= "" then os.remove(PRISEGTA) end
+    end
+
+    local function parsisiusti(url, kelias)
+        os.remove(kelias)
+        local baigta = false
+        local statusai = require("moonloader").download_status
+        downloadUrlToFile(url .. "?t=" .. os.time(), kelias, function(_, status)
+            if status == statusai.STATUS_ENDDOWNLOADDATA then baigta = true end
+        end)
+        local pradzia = os.clock()
+        while not baigta and os.clock() - pradzia < 20 do wait(100) end
+        wait(200)
+        return baigta and doesFileExist(kelias)
+    end
+
+    local function gautiSarasa()
+        if V.vyksta then return end
+        V.vyksta, V.busena = true, "Gaunamas versijų sąrašas..."
+        lua_thread.create(function()
+            local tmp = APLANKAS .. "\\versijos_tmp.json"
+            if not doesDirectoryExist(APLANKAS) then createDirectory(APLANKAS) end
+            local ok = parsisiusti(REPO .. "versijos.json", tmp)
+            local d = ok and decodeJson(skaityti(tmp) or "")
+            os.remove(tmp)
+            V.vyksta = false
+            if type(d) == "table" and type(d.versijos) == "table" and #d.versijos > 0 then
+                V.sarasas, V.busena = d.versijos, nil
+                V.pasirinkta = 1
+                for i, v in ipairs(d.versijos) do if v.versija == dabartine() then V.pasirinkta = i end end
+            else
+                V.busena = "Nepavyko gauti versijų sąrašo iš GitHub."
+            end
+        end)
+    end
+
+    local function idiegti(v, naujausia)
+        if V.vyksta then return end
+        V.vyksta, V.busena = true, "Siunčiama v" .. v.versija .. "..."
+        lua_thread.create(function()
+            local kelias = thisScript().path
+            local tmp = kelias .. ".pasirinkta"
+            if not parsisiusti(REPO .. v.failas, tmp) then
+                V.vyksta, V.busena = false, "Nepavyko parsisiųsti v" .. v.versija .. "."
+                return
+            end
+            local turinys = skaityti(tmp) or ""
+            local failoVersija = turinys:match('script_version%("([^"]+)"%)')
+            if #turinys < 10000 or not loadfile(tmp) or failoVersija ~= v.versija then
+                os.remove(tmp)
+                V.vyksta, V.busena = false, "Parsiųstas failas sugadintas ar ne tos versijos, nieko nekeičiu."
+                return
+            end
+            os.remove(kelias .. ".bak")
+            os.rename(kelias, kelias .. ".bak")
+            if not os.rename(tmp, kelias) then
+                os.rename(kelias .. ".bak", kelias)
+                V.vyksta, V.busena = false, "Nepavyko pakeisti scripto failo."
+                return
+            end
+            if naujausia then os.remove(PRISEGTA) else rasyti(PRISEGTA, v.versija) end
+            rasyti(ATNAUJINTA, dabartine())
+            chat("* DPKT meniu - įdiegta v" .. v.versija .. (naujausia and "" or " (prisegta, automatiniai atnaujinimai išjungti)")
+                .. ", perkraunama...")
+            wait(500)
+            thisScript():reload()
+        end)
+    end
+
+    function DPKT_VERSIJOS_ATIDARYTI()
+        V.langas[0] = true
+        V.klausti = false
+        if not V.sarasas then gautiSarasa() end
+    end
+
+    imgui.OnFrame(function() return V.langas[0] end, function()
+        imgui.SetNextWindowSize(imgui.ImVec2(520, 470), imgui.Cond.FirstUseEver)
+        imgui.Begin("DPKT versijos pasirinkimas##dpkt_versijos", V.langas)
+        imgui.Text("Dabartinė versija: v" .. dabartine() .. (DPKT_PRISEGTA and " (prisegta)" or ""))
+        imgui.TextColored(imgui.ImVec4(1.00, 0.80, 0.20, 1.00),
+            "Senesnės versijos gali nepalaikyti versijos parinkimo.")
+        imgui.TextDisabled("Iš GitHub archyvo įdiegtose versijose jis visada yra per /dpversija.")
+        imgui.TextDisabled("Pasirinkus ne naujausią versiją automatiniai atnaujinimai išjungiami,")
+        imgui.TextDisabled("kol vėl nepasirinksi naujausios.")
+        imgui.Separator()
+        if V.busena then imgui.Text(V.busena) end
+        if V.sarasas then
+            imgui.BeginChild("##dpkt_versiju_sarasas", imgui.ImVec2(0, -60), true)
+            for i, v in ipairs(V.sarasas) do
+                local zyme = "v" .. tostring(v.versija)
+                if i == 1 then zyme = zyme .. "  (naujausia)" end
+                if v.versija == dabartine() then zyme = zyme .. "  - dabar" end
+                if v.pastaba and v.pastaba ~= "" then zyme = zyme .. "  - " .. v.pastaba end
+                if imgui.Selectable(zyme .. "##dpkt_v" .. i, V.pasirinkta == i) then
+                    V.pasirinkta, V.klausti = i, false
+                end
+            end
+            imgui.EndChild()
+            local v = V.sarasas[V.pasirinkta]
+            if v and not V.klausti then
+                if imgui.Button("Įdiegti v" .. tostring(v.versija), imgui.ImVec2(200, 0)) and not V.vyksta then V.klausti = true end
+                imgui.SameLine()
+                if imgui.Button("Atnaujinti sąrašą", imgui.ImVec2(150, 0)) then gautiSarasa() end
+            elseif v then
+                imgui.Text("Įdiegti v" .. tostring(v.versija) .. "? Scriptas persikraus.")
+                if imgui.Button("Taip", imgui.ImVec2(100, 0)) then
+                    V.klausti = false
+                    idiegti(v, V.pasirinkta == 1)
+                end
+                imgui.SameLine()
+                if imgui.Button("Ne", imgui.ImVec2(100, 0)) then V.klausti = false end
+            end
+        elseif not V.vyksta then
+            if imgui.Button("Gauti versijų sąrašą", imgui.ImVec2(200, 0)) then gautiSarasa() end
+        end
+        imgui.End()
+    end)
+
+    -- /dpversija užregistruojama, kai SA-MP pasiruošęs (scripto main lieka toks pat)
+    local senasMain = main
+    function main()
+        lua_thread.create(function()
+            while not isSampAvailable() do wait(100) end
+            sampRegisterChatCommand("dpversija", DPKT_VERSIJOS_ATIDARYTI)
+            if DPKT_PRISEGTA then
+                wait(3000)
+                chat("* DPKT meniu - versija v" .. DPKT_PRISEGTA .. " prisegta, automatiniai atnaujinimai išjungti. Pakeisti: /dpversija")
+            end
+        end)
+        return senasMain()
+    end
+end)() end
+-- <<< DPKT versijos pasirinkimas

@@ -4,6 +4,11 @@ Autorius: Dex. Naujausia versija viršuje.
 
 Versijos: 1 – dialogų versija, 2 – mimgui. 2.x.x: vidurinis skaičius keičiasi su didesniais pakeitimais, paskutinis – su smulkiais.
 
+## 2.17.0 – Versijos pasirinkimas
+- Nustatymuose „Versijos pasirinkimas“ (arba komanda /dpversija): galima įdiegti ankstesnę versiją iš GitHub – 27 išlikusios versijos nuo v3.4 iki dabartinės (v3.4–v5.8 – sena numeracija, iki 2.9.0).
+- Pasirinkta ne naujausia versija prisegama: automatiniai atnaujinimai jos nebekeičia, kol vėl nepasirenkama naujausia. Įkėlus scriptą chate primenama, kad versija prisegta.
+- Į visas archyvines versijas pridėtas /dpversija, tad grįžti galima iš bet kurios. Senesnės versijos gali nepalaikyti versijos parinkimo meniu – jose naudok /dpversija.
+
 ## 2.16.1
 - Event fonduose „Davei ... €“ parašoma tik įsitikinus, kad serveris neatsakė „Tokios komandos nėra“. Be prieigos prie /mgduoti, /tduoti ar /eduoti rašoma tik „Neturi prieigos prie komandos ...“, o „Duoti pinigų“ lange tai primenama.
 
