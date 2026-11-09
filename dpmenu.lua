@@ -1,6 +1,6 @@
 script_name("DPKT meniu")
 script_author("Dex")
-script_version("2.18.2")
+script_version("2.18.3")
 
 require "lib.moonloader"
 local sampev = require "lib.samp.events"
@@ -177,10 +177,7 @@ local NUMATYTI_NUSTATYMAI = {
     dev = false,                 -- Dev režimas: atsitiktiniai duomenys, kol nėra tikrų
     sriftas = 17,                -- šrifto dydis (taikoma perkrovus scriptą)
     langoAlfa = 1.0,             -- lango nepermatomumas (1 = visiškai nepermatomas)
-    tema = 2,                    -- 1 klasikinė, 2 mėlyna, 3 smaragdinė, 4-7 kitų akcentų, 8 vaivorykštė
-    vaivorykste = false,         -- vaivorykštinė pavadinimo juosta (išjungus - juoda)
-    animacija = true,            -- ar vaivorykštė juda
-    vaivorykstesGreitis = 0.08,  -- kaip greitai juda
+    tema = 2,                    -- 1 klasikinė, 2 mėlyna, 3 smaragdinė, 4-7 kitų akcentų
     pauze = 750,                 -- ms tarp komandų
     laukti = 0.5,                -- s, kiek laukti serverio atsakymo
     persijungimoMin = 15,        -- min, persijungimo tarp paskyrų riba
@@ -3215,6 +3212,10 @@ end
 -- Po kiekvieno atnaujinimo čia pridedamas naujas įrašas (ir pakeičiamas script_version).
 -- Versijų istorija (naujausia viršuje). Rodoma skiltyje „Pakeitimai“.
 local PAKEITIMAI = {
+    { versija = "2.18.3", pakeitimai = {
+        "Pašalinta viskas, kas susiję su vaivorykšte: vaivorykštinė pavadinimo juosta su jos nustatymais (juda, greitis) ir tema „Gėj + ss“. Kas ją buvo pasirinkęs, gauna Mėlyną. Pavadinimo juosta dabar visada juoda su akcento linija.",
+        "Backend changes: atlaisvintos dar 2 vietos vietiniams kintamiesiems (dabar 160/200).",
+    } },
     { versija = "2.18.2", pakeitimai = {
         "5 naujos temos: Violetinė, Raudona, Auksinė, Ledinė ir „Gėj + ss“ – viskas vaivorykštės spalvomis ir pamažu juda (pavadinimo juosta irgi vaivorykštinė). Numatytoji lieka Mėlyna.",
         "Tema renkama iš išskleidžiamo sąrašo (Nustatymai -> Išvaizda), ne mygtukais.",
@@ -4849,7 +4850,7 @@ local function nustatymuRodikliai()
     nustUI = {}
     for k, v in pairs(nust) do
         if type(v) == "boolean" then nustUI[k] = new.bool(v)
-        elseif k == "langoAlfa" or k == "vaivorykstesGreitis" or k == "laukti" then nustUI[k] = new.float(v)
+        elseif k == "langoAlfa" or k == "laukti" then nustUI[k] = new.float(v)
         else nustUI[k] = new.int(v) end
     end
     return nustUI
@@ -4978,7 +4979,7 @@ TURINYS.nustatymai = function()
     end
 
     skyrius("Išvaizda")
-    local TEMOS = { "Klasikinė", "Mėlyna", "Smaragdinė", "Violetinė", "Raudona", "Auksinė", "Ledinė", "Gėj + ss" }
+    local TEMOS = { "Klasikinė", "Mėlyna", "Smaragdinė", "Violetinė", "Raudona", "Auksinė", "Ledinė" }
     imgui.PushItemWidth(220)
     if imgui.BeginCombo("Tema##tema", TEMOS[nust.tema] or TEMOS[2]) then
         for i, pav in ipairs(TEMOS) do
@@ -5000,11 +5001,6 @@ TURINYS.nustatymai = function()
     end
     TPilkas("Šrifto dydis pritaikomas perkrovus scriptą.")
     slankiklisFloat("langoAlfa", "Lango nepermatomumas", 0.5, 1.0, "%.2f")
-    zymimasis("vaivorykste", "Vaivorykštinė pavadinimo juosta")
-    if nust.vaivorykste then
-        zymimasis("animacija", "Vaivorykštė juda")
-        if nust.animacija then slankiklisFloat("vaivorykstesGreitis", "Judėjimo greitis", 0.01, 0.5, "%.2f") end
-    end
 
     imgui.Spacing()
     imgui.Separator()
@@ -5379,8 +5375,7 @@ KONST.LT_SIMBOLIAI = ffi.new("ImWchar[9]", 0x0020, 0x00FF, 0x0100, 0x017F, 0x201
 
 ---------------------------------------------------------------- UI: JUODA TEMA + VAIVORYKŠTĖ
 -- Temos (Nustatymai -> Išvaizda): 1 klasikinė (pilka, kampuota), 2 mėlyna (numatytoji), 3 smaragdinė (plokščios
--- kortelės), 4-7 kaip mėlyna, tik kito akcento (violetinė, raudona, auksinė, ledinė), 8 "Gėj + ss" - vaivorykštė
--- (spalvos juda; perpiešiama kas kadrą). SPALVA_AKCENTAS keičiama vietoje.
+-- kortelės), 4-7 kaip mėlyna, tik kito akcento (violetinė, raudona, auksinė, ledinė). SPALVA_AKCENTAS keičiama vietoje.
 local function juodaTema()
     local TEMU_AKCENTAI = {
         [2] = { 0.33, 0.62, 0.98 }, [4] = { 0.66, 0.45, 0.98 }, [5] = { 0.95, 0.33, 0.36 },
@@ -5389,27 +5384,17 @@ local function juodaTema()
     local st = imgui.GetStyle()
     local c, k = st.Colors, imgui.Col
     local tema = nust.tema
-    if tema ~= 1 and tema ~= 3 and tema ~= 8 and not TEMU_AKCENTAI[tema] then tema = 2 end
+    -- nežinoma (pvz. išimta "Gėj + ss") -> mėlyna
+    if tema ~= 1 and tema ~= 3 and not TEMU_AKCENTAI[tema] then
+        tema = 2
+        nust.tema = 2
+        nustatymaiPakeisti = true
+    end
     local function v4(r, g, b, al) return imgui.ImVec4(r, g, b, al or 1) end
     local function v2(x, y) return imgui.ImVec2(x, y) end
-    -- HSV -> ImVec4 (vaivorykštei)
-    local function hsv(h, sat, v, al)
-        h = (h % 1) * 6
-        local i = math.floor(h)
-        local f = h - i
-        local p, q, t = v * (1 - sat), v * (1 - sat * f), v * (1 - sat * (1 - f))
-        local r, g, b
-        if i == 0 then r, g, b = v, t, p elseif i == 1 then r, g, b = q, v, p elseif i == 2 then r, g, b = p, v, t
-        elseif i == 3 then r, g, b = p, q, v elseif i == 4 then r, g, b = t, p, v else r, g, b = v, p, q end
-        return v4(r, g, b, al)
-    end
     local A = SPALVA_AKCENTAS
-    local h = os.clock() * math.max(nust.vaivorykstesGreitis or 0.08, 0.02)
     if tema == 1 then A.x, A.y, A.z = 0.75, 0.75, 0.75
     elseif tema == 3 then A.x, A.y, A.z = 0.22, 0.82, 0.64
-    elseif tema == 8 then
-        local x = hsv(h, 0.65, 1)
-        A.x, A.y, A.z = x.x, x.y, x.z
     else A.x, A.y, A.z = TEMU_AKCENTAI[tema][1], TEMU_AKCENTAI[tema][2], TEMU_AKCENTAI[tema][3] end
     local a = A
 
@@ -5469,7 +5454,7 @@ local function juodaTema()
         return
     end
 
-    -- mėlyna ir kitos akcento temos (bei vaivorykštė): rėmeliai, apvalesni laukai
+    -- mėlyna ir kitos akcento temos: rėmeliai, apvalesni laukai
     st.ChildBorderSize, st.FrameBorderSize = 1, 1
     st.ChildRounding, st.FrameRounding, st.PopupRounding, st.GrabRounding, st.ScrollbarRounding = 5, 4, 6, 4, 8
     st.WindowPadding, st.FramePadding = v2(12, 10), v2(8, 4)
@@ -5480,20 +5465,6 @@ local function juodaTema()
     c[k.SliderGrab], c[k.SliderGrabActive] = v4(a.x * 0.85, a.y * 0.85, a.z * 0.85), v4(a.x, a.y, a.z)
     c[k.CheckMark], c[k.TextSelectedBg] = v4(a.x, a.y, a.z), v4(a.x, a.y, a.z, 0.35)
 
-    if tema == 8 then
-        -- "Gėj + ss": kiekvienas elementas savo vaivorykštės atspalviu, viskas pamažu juda
-        c[k.TextDisabled]  = hsv(h + 0.05, 0.25, 0.80)
-        c[k.Border]        = hsv(h + 0.10, 0.70, 0.85)
-        c[k.Separator]     = hsv(h + 0.20, 0.70, 0.80)
-        c[k.PopupBg]       = hsv(h + 0.50, 0.50, 0.07)
-        c[k.FrameBg], c[k.FrameBgHovered], c[k.FrameBgActive] = hsv(h + 0.30, 0.55, 0.22), hsv(h + 0.30, 0.60, 0.30), hsv(h + 0.30, 0.65, 0.38)
-        c[k.Button], c[k.ButtonHovered], c[k.ButtonActive] = hsv(h + 0.45, 0.60, 0.30), hsv(h + 0.45, 0.70, 0.45), hsv(h + 0.45, 0.75, 0.55)
-        c[k.Header], c[k.HeaderHovered], c[k.HeaderActive] = hsv(h + 0.60, 0.65, 0.40), hsv(h + 0.60, 0.70, 0.50), hsv(h + 0.60, 0.75, 0.60)
-        c[k.ScrollbarGrab], c[k.ScrollbarGrabHovered], c[k.ScrollbarGrabActive] = hsv(h + 0.75, 0.60, 0.50), hsv(h + 0.75, 0.65, 0.65), hsv(h + 0.75, 0.70, 0.80)
-        c[k.SliderGrab], c[k.SliderGrabActive] = hsv(h + 0.85, 0.65, 0.90), hsv(h + 0.85, 0.65, 1)
-        c[k.CheckMark] = hsv(h + 0.90, 0.60, 1)
-        return
-    end
     c[k.Border], c[k.Separator] = v4(0.30, 0.30, 0.32), v4(0.30, 0.30, 0.32)
     c[k.FrameBg], c[k.FrameBgHovered], c[k.FrameBgActive] = v4(0.12, 0.12, 0.12), v4(0.18, 0.18, 0.18), v4(0.23, 0.23, 0.23)
     c[k.Button], c[k.ButtonHovered], c[k.ButtonActive] = v4(0.16, 0.16, 0.16), v4(0.24, 0.24, 0.24), v4(0.30, 0.30, 0.30)
@@ -5503,92 +5474,36 @@ local function juodaTema()
     c[k.ScrollbarGrab], c[k.ScrollbarGrabHovered], c[k.ScrollbarGrabActive] = v4(0.30, 0.30, 0.30), v4(0.38, 0.38, 0.38), v4(0.46, 0.46, 0.46)
 end
 
--- HSV (0-1) -> RGB
-local function hsv(h, s, v)
-    h = (h % 1) * 6
-    local i = math.floor(h)
-    local f = h - i
-    local p, q, t = v * (1 - s), v * (1 - s * f), v * (1 - s * (1 - f))
-    if i == 0 then return v, t, p elseif i == 1 then return q, v, p
-    elseif i == 2 then return p, v, t elseif i == 3 then return p, q, v
-    elseif i == 4 then return t, p, v end
-    return v, p, q
-end
-
-local function vaivorykstesSpalva(h)
-    local r, g, b = hsv(h, 0.75, 1)
-    return imgui.ColorConvertFloat4ToU32(imgui.ImVec4(r, g, b, 1))
-end
-
 KONST.SRIFTO_DYDIS = nust.sriftas  -- pagrindinio šrifto dydis (Nustatymai)
 local TITULO_AUKSTIS = 36
 
--- pavadinimo juosta: juoda arba vaivorykštinė (judanti); grąžina true, jei paspausta "X"
+-- pavadinimo juosta (juoda, apačioje akcento linija); grąžina true, jei paspausta "X"
 local function pavadinimoJuosta(pavadinimas)
     local p = imgui.GetWindowPos()
     local w = imgui.GetWindowWidth()
     local dl = imgui.GetWindowDrawList()
     dl:PushClipRect(p, imgui.ImVec2(p.x + w, p.y + TITULO_AUKSTIS), false)
 
-    if not (nust.vaivorykste or nust.tema == 8) then
-        dl:AddRectFilled(p, imgui.ImVec2(p.x + w, p.y + TITULO_AUKSTIS), 0xFF000000)
-        dl:AddLine(imgui.ImVec2(p.x, p.y + TITULO_AUKSTIS - 1), imgui.ImVec2(p.x + w, p.y + TITULO_AUKSTIS - 1),
-            imgui.ColorConvertFloat4ToU32(imgui.ImVec4(SPALVA_AKCENTAS.x, SPALVA_AKCENTAS.y, SPALVA_AKCENTAS.z, 0.85)), 2)
-        if titulinisSriftas then imgui.PushFont(titulinisSriftas) end
-        local dydis = imgui.CalcTextSize(pavadinimas)
-        local ty = p.y + (TITULO_AUKSTIS - dydis.y) / 2
-        dl:AddText(imgui.ImVec2(p.x + 14, ty), 0xFFFFFFFF, pavadinimas)
-        if titulinisSriftas then imgui.PopFont() end
-        -- versija šalia pavadinimo
-        local ver = "v" .. tostring(thisScript().version)
-        local vd = imgui.CalcTextSize(ver)
-        dl:AddText(imgui.ImVec2(p.x + 14 + dydis.x + 10, ty + dydis.y - vd.y - 1),
-            imgui.ColorConvertFloat4ToU32(imgui.GetStyle().Colors[imgui.Col.TextDisabled]), ver)
-        dl:PopClipRect()
-        imgui.SetCursorPos(imgui.ImVec2(w - 28 - imgui.GetStyle().WindowPadding.x, 4))
-        imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.14, 0.14, 0.14, 1))
-        imgui.PushStyleColor(imgui.Col.ButtonHovered, imgui.ImVec4(0.22, 0.22, 0.22, 1))
-        imgui.PushStyleColor(imgui.Col.ButtonActive, imgui.ImVec4(0.30, 0.30, 0.30, 1))
-        local uzdaryti = imgui.Button("X##uzdaryti", imgui.ImVec2(28, TITULO_AUKSTIS - 8))
-        imgui.PopStyleColor(3)
-        imgui.SetCursorPos(imgui.ImVec2(imgui.GetStyle().WindowPadding.x, TITULO_AUKSTIS + 8))
-        return uzdaryti
-    end
-
-    local dalys = 24
-    local poslinkis = nust.animacija and os.clock() * nust.vaivorykstesGreitis or 0
-    for i = 0, dalys - 1 do
-        local x0 = p.x + w * i / dalys
-        local x1 = p.x + w * (i + 1) / dalys + 1
-        local c0 = vaivorykstesSpalva(poslinkis + i / dalys)
-        local c1 = vaivorykstesSpalva(poslinkis + (i + 1) / dalys)
-        dl:AddRectFilledMultiColor(imgui.ImVec2(x0, p.y), imgui.ImVec2(x1, p.y + TITULO_AUKSTIS), c0, c1, c1, c0)
-    end
-    -- švelnus patamsinimas apačioje, kad tekstas geriau matytųsi
-    dl:AddRectFilledMultiColor(imgui.ImVec2(p.x, p.y), imgui.ImVec2(p.x + w, p.y + TITULO_AUKSTIS),
-        0x00000000, 0x00000000, 0x59000000, 0x59000000)
-
-    -- pavadinimas: tamsus fonas po tekstu + kontūras, kad matytųsi ant bet kurios spalvos
+    dl:AddRectFilled(p, imgui.ImVec2(p.x + w, p.y + TITULO_AUKSTIS), 0xFF000000)
+    dl:AddLine(imgui.ImVec2(p.x, p.y + TITULO_AUKSTIS - 1), imgui.ImVec2(p.x + w, p.y + TITULO_AUKSTIS - 1),
+        imgui.ColorConvertFloat4ToU32(imgui.ImVec4(SPALVA_AKCENTAS.x, SPALVA_AKCENTAS.y, SPALVA_AKCENTAS.z, 0.85)), 2)
     if titulinisSriftas then imgui.PushFont(titulinisSriftas) end
     local dydis = imgui.CalcTextSize(pavadinimas)
-    local tx, ty = p.x + 18, p.y + (TITULO_AUKSTIS - dydis.y) / 2
-    dl:AddRectFilled(imgui.ImVec2(tx - 10, p.y + 5), imgui.ImVec2(tx + dydis.x + 10, p.y + TITULO_AUKSTIS - 5),
-        0xB4000000, 8)
-    for _, d in ipairs({ { -1, 0 }, { 1, 0 }, { 0, -1 }, { 0, 1 }, { 1, 1 } }) do
-        dl:AddText(imgui.ImVec2(tx + d[1], ty + d[2]), 0xFF000000, pavadinimas)
-    end
-    dl:AddText(imgui.ImVec2(tx, ty), 0xFFFFFFFF, pavadinimas)
+    local ty = p.y + (TITULO_AUKSTIS - dydis.y) / 2
+    dl:AddText(imgui.ImVec2(p.x + 14, ty), 0xFFFFFFFF, pavadinimas)
     if titulinisSriftas then imgui.PopFont() end
+    -- versija šalia pavadinimo
+    local ver = "v" .. tostring(thisScript().version)
+    local vd = imgui.CalcTextSize(ver)
+    dl:AddText(imgui.ImVec2(p.x + 14 + dydis.x + 10, ty + dydis.y - vd.y - 1),
+        imgui.ColorConvertFloat4ToU32(imgui.GetStyle().Colors[imgui.Col.TextDisabled]), ver)
     dl:PopClipRect()
-
-    -- uždarymo mygtukas
     imgui.SetCursorPos(imgui.ImVec2(w - 28 - imgui.GetStyle().WindowPadding.x, 4))
-    imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0, 0, 0, 0.35))
-    imgui.PushStyleColor(imgui.Col.ButtonHovered, imgui.ImVec4(0, 0, 0, 0.6))
-    imgui.PushStyleColor(imgui.Col.ButtonActive, imgui.ImVec4(0, 0, 0, 0.8))
+    imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.14, 0.14, 0.14, 1))
+    imgui.PushStyleColor(imgui.Col.ButtonHovered, imgui.ImVec4(0.22, 0.22, 0.22, 1))
+    imgui.PushStyleColor(imgui.Col.ButtonActive, imgui.ImVec4(0.30, 0.30, 0.30, 1))
     local uzdaryti = imgui.Button("X##uzdaryti", imgui.ImVec2(28, TITULO_AUKSTIS - 8))
     imgui.PopStyleColor(3)
-
     imgui.SetCursorPos(imgui.ImVec2(imgui.GetStyle().WindowPadding.x, TITULO_AUKSTIS + 8))
     return uzdaryti
 end
@@ -5653,8 +5568,8 @@ local function nickoVeiksmai(nm, tikKopijuoti)
 end
 
 imgui.OnFrame(function() return ui.atidarytas[0] end, function()
-    -- tema pakeista Nustatymuose: pritaikom prieš piešiant langą ("Gėj + ss" spalvos juda - kas kadrą)
-    if ui.temaPakeista or nust.tema == 8 then
+    -- tema pakeista Nustatymuose: pritaikom prieš piešiant langą
+    if ui.temaPakeista then
         ui.temaPakeista = false
         juodaTema()
         langoAlfa()
