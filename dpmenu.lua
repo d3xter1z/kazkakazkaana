@@ -1,6 +1,6 @@
 script_name("DPKT meniu")
 script_author("Dex")
-script_version("2.18.0")
+script_version("2.18.1")
 
 require "lib.moonloader"
 local sampev = require "lib.samp.events"
@@ -190,6 +190,7 @@ local NUMATYTI_NUSTATYMAI = {
     zurnalas = false,            -- derinimo žurnalas (config\dpkt\zurnalai), pagal nutylėjimą išjungtas
     nustVersija = 4,             -- nustatymų failo versija (senų nustatymų perkėlimui)
     autoAtnaujinimai = true,     -- įkėlus scriptą tikrinti GitHub ir atsinaujinti
+    blokuotiF4 = true,           -- F4 nieko nedaro (be "Returning to class selection after next death")
 }
 local nust = {}
 local nustatymaiPakeisti = false
@@ -3211,6 +3212,10 @@ end
 -- Po kiekvieno atnaujinimo čia pridedamas naujas įrašas (ir pakeičiamas script_version).
 -- Versijų istorija (naujausia viršuje). Rodoma skiltyje „Pakeitimai“.
 local PAKEITIMAI = {
+    { versija = "2.18.1", pakeitimai = {
+        "F4 atšaukiamas: paspaudus F4 scriptas iškart atstato SA-MP žymą, tad į klasės pasirinkimą po mirties negrąžina (chate parašoma „F4 atšauktas“). Veikia su SA-MP 0.3.7 R1, R3, R5; Nustatymuose rodoma atpažinta versija.",
+        "Galima išjungti Nustatymuose (Chatas ir serverio langai). Alt+F4 veikia kaip įprastai.",
+    } },
     { versija = "2.18.0", pavadinimas = "Serverio pranešimai", pakeitimai = {
         "Nauja skiltis „Serverio pranešimai“ (Analizės įrankiai): „G kill pranešimai“ (kas ką nužudė lipdamas į tr. priemonę) ir „/kick'ai“ (adminas, žaidėjas, priežastis).",
         "Pranešimai renkami iš chato tik kol esi ON (su nuleistu žaidimu be Anti-ESC – ne) – tai parašyta raudonai skilties viršuje. Istorija saugoma faile (config\\dpkt\\serverio_pranesimai.json), lieka perkrovus.",
@@ -4921,6 +4926,14 @@ local function rodytiNustatymus()
     zymimasis("slepti", "Slėpti chate eilutes, kurias renka scriptas", "/visidarbuotojai, /dfondas, /info, /skirtidir atsakymai patikros metu")
     zymimasis("chate", "Pranešimus rodyti ir chate", "ne tik skiltyje Statusas")
     zymimasis("pasveikinimas", "Rodyti žinutę įkėlus scriptą")
+    zymimasis("blokuotiF4", "F4 nieko nedaro", "atšaukia „Returning to class selection after next death“; veikia su SA-MP 0.3.7 R1, R3, R5")
+    if nust.blokuotiF4 and ui.sampVersija then
+        if ui.sampVersija:find("nežinoma", 1, true) then
+            T("   Tavo SA-MP versija " .. ui.sampVersija .. " – F4 atšaukimas neveiks.", SPALVA_RAUDONA)
+        else
+            TPilkas("   Atpažinta SA-MP " .. ui.sampVersija .. ".")
+        end
+    end
 
     skyrius("Patikros")
     slankiklisInt("pauze", "Pauzė tarp komandų", 300, 3000, "%d ms")
@@ -6178,6 +6191,56 @@ imgui.OnFrame(function() return darboAnalize.langas ~= nil and darboAnalize.lang
 end)
 
 ---------------------------------------------------------------- MAIN
+-- F4: SA-MP'e po jo kitą kartą mirus grąžinama į klasės pasirinkimą. Įjungus nustatymą klavišas nepasiekia
+-- žaidimo per lango žinutes (WM_KEYDOWN / WM_KEYUP; Alt+F4 ateina kaip WM_SYSKEYDOWN, todėl neliečiamas).
+function onWindowMessage(msg, wparam, lparam)
+    if wparam == 0x73 and (msg == 0x100 or msg == 0x101) and nust.blokuotiF4 then
+        consumeWindowMessage(true, false)
+    end
+end
+
+-- SA-MP F4 skaito pats, todėl dar atstatoma jo vėliavėlė CLocalPlayer::m_classSelection.m_bEnableAfterDeath
+-- (poslinkiai iš BlastHack SAMP-API; versija atpažįstama pagal samp.dll entry point, kitoms versijoms neveikia)
+local klasesPasirinkimas = {
+    -- entry point = { CNetGame* adresas, ->Pools, ->CPlayerPool, ->CLocalPlayer, ->m_bEnableAfterDeath }
+    VERSIJOS = {
+        [0x31DF13] = { 0x21A0F8, 0x3CD, 0x18, 0x22,   0x2FA, "0.3.7-R1" },
+        [0xCC4D0]  = { 0x26E8DC, 0x3DE, 0x08, 0x2F3A, 0x2FA, "0.3.7-R3" },
+        [0xCBC90]  = { 0x26EB94, 0x3DE, 0x04, 0x26,   0x2FA, "0.3.7-R5" },
+    },
+    baze = 0, o = nil, tikrinta = false,
+}
+
+-- grąžina true, jei vėliavėlė buvo įjungta (paspaustas F4) ir ją atstatėm
+function klasesPasirinkimas.atstatyti()
+    local K = klasesPasirinkimas
+    if not K.tikrinta then
+        K.tikrinta = true
+        K.baze = getModuleHandle("samp.dll") or 0
+        if K.baze == 0 then return false end
+        local ep = readMemory(K.baze + readMemory(K.baze + 0x3C, 4, true) + 0x28, 4, true)
+        K.o = K.VERSIJOS[ep]
+        ui.sampVersija = K.o and K.o[6] or string.format("nežinoma (0x%X)", ep or 0)
+        derinimas.rasyti("F4 apsauga: samp.dll entry point " .. string.format("0x%X", ep or 0) .. " -> "
+            .. (K.o and K.o[6] or "nežinoma versija"))
+    end
+    local o = K.o
+    if not o or K.baze == 0 then return false end
+    local ng = readMemory(K.baze + o[1], 4, true)
+    if ng == 0 then return false end
+    local pools = readMemory(ng + o[2], 4, true)
+    if pools == 0 then return false end
+    local pp = readMemory(pools + o[3], 4, true)
+    if pp == 0 then return false end
+    local lp = readMemory(pp + o[4], 4, true)
+    if lp == 0 then return false end
+    if readMemory(lp + o[5], 4, true) == 1 then
+        writeMemory(lp + o[5], 4, 0, true)
+        return true
+    end
+    return false
+end
+
 function main()
     if not isSampLoaded() or not isSampfuncsLoaded() then return end
     while not isSampAvailable() do wait(100) end
@@ -6215,6 +6278,19 @@ function main()
         derinimas.valyti(false)
         derinimas.rasyti(string.format("==================== DPKT meniu v%s įkeltas ====================", tostring(thisScript().version)))
     end
+
+    -- F4 apsauga: kas 100 ms atstatoma SA-MP "grįžti į klasės pasirinkimą po mirties" vėliavėlė
+    lua_thread.create(function()
+        while true do
+            wait(100)
+            if nust.blokuotiF4 then
+                local ok, atstatyta = pcall(klasesPasirinkimas.atstatyti)
+                if ok and atstatyta then
+                    sampAddChatMessage(saugusLtu("* DPKT meniu: F4 atšauktas, į klasės pasirinkimą negrįši."), ZALIA)
+                end
+            end
+        end
+    end)
 
     -- nustatymai išsaugomi ne dažniau nei kas sekundę (kad slankikliai nerašytų failo kas kadrą)
     while true do

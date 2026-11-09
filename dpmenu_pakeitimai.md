@@ -4,6 +4,10 @@ Autorius: Dex. Naujausia versija viršuje.
 
 Versijos: 1 – dialogų versija, 2 – mimgui. 2.x.x: vidurinis skaičius keičiasi su didesniais pakeitimais, paskutinis – su smulkiais.
 
+## 2.18.1
+- F4 atšaukiamas: paspaudus F4 scriptas iškart atstato SA-MP žymą, tad į klasės pasirinkimą po mirties negrąžina (chate parašoma „F4 atšauktas“). Veikia su SA-MP 0.3.7 R1, R3, R5; Nustatymuose rodoma atpažinta versija.
+- Galima išjungti Nustatymuose (Chatas ir serverio langai). Alt+F4 veikia kaip įprastai.
+
 ## 2.18.0 – Serverio pranešimai
 - Nauja skiltis „Serverio pranešimai“ (Analizės įrankiai): „G kill pranešimai“ (kas ką nužudė lipdamas į tr. priemonę) ir „/kick'ai“ (adminas, žaidėjas, priežastis).
 - Pranešimai renkami iš chato tik kol esi ON (su nuleistu žaidimu be Anti-ESC – ne) – tai parašyta raudonai skilties viršuje. Istorija saugoma faile (config\dpkt\serverio_pranesimai.json), lieka perkrovus.
