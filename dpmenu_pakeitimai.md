@@ -4,6 +4,11 @@ Autorius: Dex. Naujausia versija viršuje.
 
 Versijos: 1 – dialogų versija, 2 – mimgui. 2.x.x: vidurinis skaičius keičiasi su didesniais pakeitimais, paskutinis – su smulkiais.
 
+## 2.18.2
+- 5 naujos temos: Violetinė, Raudona, Auksinė, Ledinė ir „Gėj + ss“ – viskas vaivorykštės spalvomis ir pamažu juda (pavadinimo juosta irgi vaivorykštinė). Numatytoji lieka Mėlyna.
+- Tema renkama iš išskleidžiamo sąrašo (Nustatymai -> Išvaizda), ne mygtukais.
+- Backend changes: Lua viename faile leidžia ne daugiau kaip 200 vietinių (local) kintamųjų, o scriptas jau buvo pasiekęs ribą (200/200) – nauja funkcija nebūtų sukompiliavusi. 10 skilčių piešimo funkcijų perkelta tiesiai į TURINYS lentelę, 29 retai naudojamos konstantos sudėtos į vieną KONST lentelę. Dabar 162/200, tad vietos naujoms funkcijoms užteks. Veikimas nepasikeitė.
+
 ## 2.18.1
 - F4 atšaukiamas: paspaudus F4 scriptas iškart atstato SA-MP žymą, tad į klasės pasirinkimą po mirties negrąžina (chate parašoma „F4 atšauktas“). Veikia su SA-MP 0.3.7 R1, R3, R5; Nustatymuose rodoma atpažinta versija.
 - Galima išjungti Nustatymuose (Chatas ir serverio langai). Alt+F4 veikia kaip įprastai.
