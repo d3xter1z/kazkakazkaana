@@ -4,6 +4,9 @@ Autorius: Dex. Naujausia versija viršuje.
 
 Versijos: 1 – dialogų versija, 2 – mimgui. 2.x.x: vidurinis skaičius keičiasi su didesniais pakeitimais, paskutinis – su smulkiais.
 
+## 2.18.4
+- Aktyvume darbo data rodoma prie to darbo, kuriam ji priklauso: „Darbas: Prekeivis nuo 2026-11-03, Immortal“, o ne „Prekeivis, Immortal nuo 2026-11-03“ (atrodė, lyg data būtų mafijos/gaujos). Seniau išsaugotose patikrose lieka kaip buvo.
+
 ## 2.18.3
 - Pašalinta viskas, kas susiję su vaivorykšte: vaivorykštinė pavadinimo juosta su jos nustatymais (juda, greitis) ir tema „Gėj + ss“. Kas ją buvo pasirinkęs, gauna Mėlyną. Pavadinimo juosta dabar visada juoda su akcento linija.
 - Backend changes: atlaisvintos dar 2 vietos vietiniams kintamiesiems (dabar 160/200).

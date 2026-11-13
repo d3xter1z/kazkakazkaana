@@ -1,6 +1,6 @@
 script_name("DPKT meniu")
 script_author("Dex")
-script_version("2.18.3")
+script_version("2.18.4")
 
 require "lib.moonloader"
 local sampev = require "lib.samp.events"
@@ -887,7 +887,8 @@ local function atpazintiInfo(tekstas)
     -- mafijos/gaujos: "Darbas: Nedirbi  | *Cosa Nostra („pravardė“)". Dalys per "|"; "Nedirbi" ir pravardės nuimamos.
     local darboEil = t:match("Darbas:%s*([^\n]+)")
     if darboEil then
-        local vardai = {}
+        -- vardai - palyginimui tarp dienų; suData - rodymui, data prie savo darbo ("Prekeivis nuo 2026-11-03, Immortal")
+        local vardai, suData = {}, {}
         for dalis in (darboEil .. "|"):gmatch("(.-)|") do
             dalis = apkarpyti(dalis):gsub("^%*", "")
             local pav, nuo = dalis:match("^(.-)%s+nuo%s+(%d%d%d%d%-%d%d%-%d%d)")
@@ -897,9 +898,11 @@ local function atpazintiInfo(tekstas)
             if pav ~= "" and pav ~= "Nedirbi" and not pav:find("^Rangas") then
                 local pavyko, u = pcall(u8, pav)
                 vardai[#vardai + 1] = pavyko and u or pav
+                suData[#suData + 1] = vardai[#vardai] .. (nuo and (" nuo " .. nuo) or "")
             end
         end
         r.darboPav = #vardai > 0 and table.concat(vardai, ", ") or "Nedirbi"   -- ne " | ", nes juo skiriami kopijuojami stulpeliai
+        r.darboTekstas = #suData > 0 and table.concat(suData, ", ") or "Nedirbi"
     end
     -- "Savaitę: 0 d. 11 val. 35 min." -> minutės
     local sd, sv, sm = t:match(ltu("Savaitę") .. ":?%s*(%d+)%s*d%.?%s*(%d+)%s*val%.?%s*(%d+)%s*min")
@@ -2898,7 +2901,8 @@ local function tikrintiAktyvuma(nickas, nuo, iki, darbas)
             rinkimas.info = nil
 
             local diena = { data = data, minutes = info.minutes, km = info.km, xp = info.xp, zuvys = info.zuvys,
-                            darboPav = info.darboPav, darboNuo = info.darboNuo, infoDarbas = info.infoDarbas }
+                            darboPav = info.darboPav, darboNuo = info.darboNuo, darboTekstas = info.darboTekstas,
+                            infoDarbas = info.infoDarbas }
             r.dienos[#r.dienos + 1] = diena
 
             -- tos dienos darbo statistika
@@ -3212,6 +3216,9 @@ end
 -- Po kiekvieno atnaujinimo čia pridedamas naujas įrašas (ir pakeičiamas script_version).
 -- Versijų istorija (naujausia viršuje). Rodoma skiltyje „Pakeitimai“.
 local PAKEITIMAI = {
+    { versija = "2.18.4", pakeitimai = {
+        "Aktyvume darbo data rodoma prie to darbo, kuriam ji priklauso: „Darbas: Prekeivis nuo 2026-11-03, Immortal“, o ne „Prekeivis, Immortal nuo 2026-11-03“ (atrodė, lyg data būtų mafijos/gaujos). Seniau išsaugotose patikrose lieka kaip buvo.",
+    } },
     { versija = "2.18.3", pakeitimai = {
         "Pašalinta viskas, kas susiję su vaivorykšte: vaivorykštinė pavadinimo juosta su jos nustatymais (juda, greitis) ir tema „Gėj + ss“. Kas ją buvo pasirinkęs, gauna Mėlyną. Pavadinimo juosta dabar visada juoda su akcento linija.",
         "Backend changes: atlaisvintos dar 2 vietos vietiniams kintamiesiems (dabar 160/200).",
@@ -4569,8 +4576,9 @@ TURINYS.aktyvumas = function()
     end
     local stulpeliuPav = {}
     for _, st in ipairs(stulpeliai) do stulpeliuPav[#stulpeliuPav + 1] = st[1] end
-    local darboEilute = paskDarbas and ("Darbas: " .. paskDarbas.darboPav
-        .. (paskDarbas.darboNuo and (" nuo " .. paskDarbas.darboNuo) or "")) or nil
+    -- darboTekstas: data prie savo darbo; senuose išsaugotuose duomenyse jo nėra - tada kaip anksčiau
+    local darboEilute = paskDarbas and ("Darbas: " .. (paskDarbas.darboTekstas or (paskDarbas.darboPav
+        .. (paskDarbas.darboNuo and (" nuo " .. paskDarbas.darboNuo) or "")))) or nil
     local xpPirma = "Patirtis pirmą dieną: " .. (r.xpPirma and (r.xpPirma .. " XP") or "nėra informacijos")
     local xpPaskutine = "Patirtis paskutinę dieną: " .. (r.xpPaskutine and (r.xpPaskutine .. " XP") or "nėra informacijos")
 

@@ -1,6 +1,11 @@
 {
  "versijos": [
   {
+   "versija": "2.18.4",
+   "failas": "versijos/dpmenu2184.lua",
+   "pastaba": ""
+  },
+  {
    "versija": "2.18.3",
    "failas": "versijos/dpmenu2183.lua",
    "pastaba": ""
