@@ -1,6 +1,6 @@
 script_name("DPKT meniu")
 script_author("Dex")
-script_version("2.18.4")
+script_version("2.18.5")
 
 require "lib.moonloader"
 local sampev = require "lib.samp.events"
@@ -3216,6 +3216,9 @@ end
 -- Po kiekvieno atnaujinimo čia pridedamas naujas įrašas (ir pakeičiamas script_version).
 -- Versijų istorija (naujausia viršuje). Rodoma skiltyje „Pakeitimai“.
 local PAKEITIMAI = {
+    { versija = "2.18.5", pakeitimai = {
+        "Backend changes.",
+    } },
     { versija = "2.18.4", pakeitimai = {
         "Aktyvume darbo data rodoma prie to darbo, kuriam ji priklauso: „Darbas: Prekeivis nuo 2026-11-03, Immortal“, o ne „Prekeivis, Immortal nuo 2026-11-03“ (atrodė, lyg data būtų mafijos/gaujos). Seniau išsaugotose patikrose lieka kaip buvo.",
     } },
@@ -3539,7 +3542,7 @@ TURINYS.pagrindinis = function()
     imgui.Separator()
     imgui.Spacing()
     local linkejimas = ui.gd and "Kas skaitys tas GD"
-        or "Sėkmingo administravimo, kantrybės su žaidėjais ir nepamiršk šypsotis :)"
+        or "Sėkmingo administravimo ir kantrybės su žaidėjais"
     imgui.SetCursorPosX(math.max(0, (imgui.GetWindowWidth() - imgui.CalcTextSize(linkejimas).x) / 2))
     T(linkejimas, ui.gd and SPALVA_RAUDONA or SPALVA_ZALIA)
 end
@@ -5665,7 +5668,7 @@ imgui.OnFrame(function() return ui.atidarytas[0] end, function()
         if imgui.IsItemHovered() then imgui.SetTooltip("Spausk, kad atidarytum Statusą") end
         if imgui.IsItemClicked() then ui.skirtukas = "statusas" end
     else
-        local paraso = "Made by Dex, with love, mua :3"
+        local paraso = "Pagaminta xrm su DPKT pagalba, ačiū jiems :)"
         imgui.SetCursorPosX((imgui.GetWindowWidth() - imgui.CalcTextSize(paraso).x) / 2)
         TPilkas(paraso)
     end
@@ -6216,7 +6219,7 @@ function main()
     sampRegisterChatCommand("vdf", function() atidarytiMeniu("fondai") end)
 
     if nust.pasveikinimas then
-        sampAddChatMessage(saugusLtu("* DPKT meniu įkeltas. Naudok /dp ir nepamiršk šypsotis :)"), ZALIA)
+        sampAddChatMessage(saugusLtu("* DPKT meniu įkeltas. Naudok /dp"), ZALIA)
     end
 
     -- ką tik atsinaujinom: parašom chate (svarbu, kad žmogus žinotų) ir statuse
