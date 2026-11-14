@@ -4,6 +4,9 @@ Autorius: Dex. Naujausia versija viršuje.
 
 Versijos: 1 – dialogų versija, 2 – mimgui. 2.x.x: vidurinis skaičius keičiasi su didesniais pakeitimais, paskutinis – su smulkiais.
 
+## 2.18.6
+- /aktyvumas su nicku ar ID (pvz. /aktyvumas Vardas_Pavarde arba /aktyvumas 54) atidaro Aktyvumą ir įrašo tą nicką į laukelį „Nickas“. Be argumento – kaip anksčiau.
+
 ## 2.18.5
 - Backend changes.
 

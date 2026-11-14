@@ -1,6 +1,6 @@
 script_name("DPKT meniu")
 script_author("Dex")
-script_version("2.18.5")
+script_version("2.18.6")
 
 require "lib.moonloader"
 local sampev = require "lib.samp.events"
@@ -3216,6 +3216,9 @@ end
 -- Po kiekvieno atnaujinimo čia pridedamas naujas įrašas (ir pakeičiamas script_version).
 -- Versijų istorija (naujausia viršuje). Rodoma skiltyje „Pakeitimai“.
 local PAKEITIMAI = {
+    { versija = "2.18.6", pakeitimai = {
+        "/aktyvumas su nicku ar ID (pvz. /aktyvumas Vardas_Pavarde arba /aktyvumas 54) atidaro Aktyvumą ir įrašo tą nicką į laukelį „Nickas“. Be argumento – kaip anksčiau.",
+    } },
     { versija = "2.18.5", pakeitimai = {
         "Backend changes.",
     } },
@@ -3477,7 +3480,7 @@ local TURINYS = {}
 
 KONST.PAGRINDINIO_KOMANDOS = {
     { "/dp",        "Atidaro DPKT meniu" },
-    { "/aktyvumas", "Atidaro aktyvumo patikrą" },
+    { "/aktyvumas", "Atidaro aktyvumo patikrą; su nicku ar ID (/aktyvumas Vardas_Pavarde) - jį įrašo" },
     { "/vdd",       "Atidaro visų darbų darbuotojus" },
     { "/vdf",       "Atidaro visų darbų fondus" },
     { "/dpversija", "Versijos pasirinkimas: įdiegti ankstesnę versiją iš GitHub" },
@@ -6214,7 +6217,23 @@ function main()
     irasyti(ui.aktIki, os.date(DATOS_FORMATAS))
 
     sampRegisterChatCommand("dp", function() atidarytiMeniu() end)
-    sampRegisterChatCommand("aktyvumas", function() atidarytiMeniu("aktyvumas") end)
+    -- /aktyvumas [nickas arba ID]: atidaro Aktyvumą ir įrašo nicką (ID -> to žaidėjo nickas)
+    sampRegisterChatCommand("aktyvumas", function(arg)
+        local x = apkarpyti(arg or ""):match("^(%S+)")
+        if not x then return atidarytiMeniu("aktyvumas") end
+        local id = tonumber(x)
+        if id then
+            if not sampIsPlayerConnected(id) then
+                klaida("Žaidėjo su ID " .. id .. " nėra.")
+                return atidarytiMeniu("aktyvumas")
+            end
+            x = tostring(sampGetPlayerNickname(id))
+        else
+            local pavyko, u = pcall(u8, x)
+            if pavyko then x = u end
+        end
+        aktyvumasNickui(x)
+    end)
     sampRegisterChatCommand("vdd", function() atidarytiMeniu("darbuotojai") end)
     sampRegisterChatCommand("vdf", function() atidarytiMeniu("fondai") end)
 
